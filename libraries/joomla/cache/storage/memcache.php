@@ -187,7 +187,7 @@ class JCacheStorageMemcache extends JCacheStorage
 		$tmparr->name = $cache_id;
 		$tmparr->size = strlen($data);
 
-		$index[] = $tmparr;
+		array_push($index, $tmparr);
 		static::$_db->set($this->_hash . '-index', $index, 0, 0);
 		$this->unlockindex();
 
