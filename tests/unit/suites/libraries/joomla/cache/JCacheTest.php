@@ -442,12 +442,17 @@ class JCacheTest extends TestCase
 	 */
 	public function testGc()
 	{
-		$this->object = JCache::getInstance('output', array('lifetime' => 2, 'defaultgroup' => ''));
+		$options = array('storage' => 'file', 'defaultgroup' => '');
+		$this->object = JCache::getInstance('output', $options);
+		$this->object->setCaching(true);
+		$this->object->setLifeTime(2/60); // Real 2 seconds
 
 		$this->object->store($this->testData_A, 42, '');
 		$this->object->store($this->testData_B, 43, '');
 
-		sleep(5);
+		sleep(3);
+
+		$this->object->cache->_getStorage()->_now = time();
 
 		$this->object->gc();
 
