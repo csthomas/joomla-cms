@@ -442,32 +442,40 @@ class JCacheTest extends TestCase
 	 */
 	public function testGc()
 	{
-		$options = array('storage' => 'file', 'defaultgroup' => '');
-		$this->object = JCache::getInstance('output', $options);
+		$this->object = JCache::getInstance('output', array('lifetime' => 0.1/60, 'storage' => 'file', 'defaultgroup' => ''));
 		$this->object->setCaching(true);
-		$this->object->setLifeTime(2/60); // Real 2 seconds
 
 		$this->object->store($this->testData_A, 42, '');
 
-		sleep(2);
+		// Wait for lifetime.
+		usleep($this->object->cache->_getStorage()->_lifetime * 1000000);
 
+		// Timer and testing interval (in seconds)
+		$timer    = 0;
+		$interval = 0.05;
+
+		// Wait for file to Expire
+		do
+		{
+			$this->object->cache->_getStorage()->_now = time();
+			$testData_A = $this->object->get(42, '');
+
+			usleep($interval * 1000000);
+
+			$timer += $interval;
+		}
+		while ($testData_A && $timer < 5);
+
+		// Also add an unexpired cache.
 		$this->object->store($this->testData_B, 43, '');
 
-		sleep(1);
-
-		$this->object->cache->_getStorage()->_now = time();
-
+		// Collect Garbage
 		$this->object->gc();
 
-		$this->assertFalse(
-			$this->object->get(42, '')
-		);
+		$this->assertFalse($testData_A);
 
 		// To be sure that cache is working
-		$this->assertEquals(
-			$this->testData_B,
-			$this->object->get(43, '')
-		);
+		$this->assertEquals($this->testData_B, $this->object->get(43, ''));
 	}
 
 	/**
