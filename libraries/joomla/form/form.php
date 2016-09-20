@@ -166,16 +166,16 @@ class JForm
 		// Process the input data.
 		foreach ($data as $k => $v)
 		{
-			$level = $group ? $group . '.' . $k : $k;
+			$level = $group != "" ? $group . '.' . $k : $k;
 
 			if ($this->findField($k, $group))
 			{
 				// If the field exists set the value.
 				$this->data->set($level, $v);
 			}
-			elseif (is_object($v) || ArrayHelper::isAssociative($v))
+			elseif (is_object($v) || is_array($v))
 			{
-				// If the value is an object or an associative array, hand it off to the recursive bind level method.
+				// If the value is an object or an array, hand it off to the recursive bind level method.
 				$this->bindLevel($level, $v);
 			}
 		}
@@ -221,7 +221,7 @@ class JForm
 			$groups = array_map('strval', $attrs ? $attrs : array());
 			$group = implode('.', $groups);
 
-			$key = $group ? $group . '.' . $name : $name;
+			$key = $group != "" ? $group . '.' . $name : $name;
 
 			// Filter the value if it exists.
 			if ($input->exists($key))
@@ -384,7 +384,7 @@ class JForm
 			return $fieldsets;
 		}
 
-		if ($group)
+		if ($group != "")
 		{
 			// Get the fields elements for a given group.
 			$elements = &$this->findGroup($group);
@@ -599,7 +599,7 @@ class JForm
 	public function getValue($name, $group = null, $default = null)
 	{
 		// If a group is set use it.
-		if ($group)
+		if ($group != "")
 		{
 			$return = $this->data->get($group . '.' . $name, $default);
 		}
@@ -985,7 +985,7 @@ class JForm
 		}
 
 		// If no existing field is found find a group element and add the field as a child of it.
-		if ($group)
+		if ($group != "")
 		{
 			// Get the fields elements for a given group.
 			$fields = &$this->findGroup($group);
@@ -1119,7 +1119,7 @@ class JForm
 		}
 
 		// If a group is set use it.
-		if ($group)
+		if ($group != "")
 		{
 			$this->data->set($group . '.' . $name, $value);
 		}
@@ -1179,7 +1179,7 @@ class JForm
 			$group = implode('.', $groups);
 
 			// Get the value from the input data.
-			if ($group)
+			if ($group != "")
 			{
 				$value = $input->get($group . '.' . $name);
 			}
@@ -1499,7 +1499,7 @@ class JForm
 		}
 
 		// Let's get the appropriate field element based on the method arguments.
-		if ($group)
+		if ($group != "")
 		{
 			// Get the fields elements for a given group.
 			$elements = &$this->findGroup($group);
@@ -1623,7 +1623,7 @@ class JForm
 		}
 
 		// Get only fields in a specific group?
-		if ($group)
+		if ($group != "")
 		{
 			// Get the fields elements for a given group.
 			$elements = &$this->findGroup($group);
@@ -1736,7 +1736,7 @@ class JForm
 
 						// If the group names for the fields element match the valid names at this
 						// level add the fields element.
-						if ($validNames == $names)
+						if ($validNames === $names)
 						{
 							$tmp[] = $fields;
 						}
