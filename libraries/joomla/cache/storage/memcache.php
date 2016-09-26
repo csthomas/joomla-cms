@@ -26,6 +26,30 @@ class JCacheStorageMemcache extends JCacheStorage
 	protected static $_db = null;
 
 	/**
+	 * Service host
+	 *
+	 * @var    string
+	 * @since  __DEPLOY_VERSION__
+	 */
+	protected $_host;
+
+	/**
+	 * Service port number
+	 *
+	 * @var    integer
+	 * @since  __DEPLOY_VERSION__
+	 */
+	protected $_port;
+
+	/**
+	 * Connection type
+	 *
+	 * @var    boolean
+	 * @since  12.1
+	 */
+	protected $_persistent = true;
+
+	/**
 	 * Payload compression level
 	 *
 	 * @var    integer
@@ -44,7 +68,16 @@ class JCacheStorageMemcache extends JCacheStorage
 	{
 		parent::__construct($options);
 
-		$this->_compress = JFactory::getConfig()->get('memcache_compress', false) ? MEMCACHE_COMPRESSED : 0;
+		$this->_host       = isset($options['memcache_server_host']) ?
+			$options['memcache_server_host'] : 'localhost';
+
+		$this->_port       = isset($options['memcache_server_port']) ?
+			$options['memcache_server_port'] : 11211;
+
+		$this->_persistent = isset($options['memcache_persist']) ?
+			(bool) $options['memcache_persist'] : true;
+
+		$this->_compress   = empty($options['memcache_compress']) ? 0 : MEMCACHE_COMPRESSED;
 
 		if (static::$_db === null)
 		{
@@ -64,24 +97,19 @@ class JCacheStorageMemcache extends JCacheStorage
 	{
 		if (!static::isSupported())
 		{
-			throw new RuntimeException('Memcache Extension is not available');
+			throw new JCacheExceptionUnsupported('The Memcache Cache Storage is not supported on this platform.');
 		}
-
-		$config = JFactory::getConfig();
-
-		$host = $config->get('memcache_server_host', 'localhost');
-		$port = $config->get('memcache_server_port', 11211);
 
 		// Create the memcache connection
 		static::$_db = new Memcache;
 
-		if ($config->get('memcache_persist', true))
+		if ($this->_persistent)
 		{
-			$result = @static::$_db->pconnect($host, $port);
+			$result = @static::$_db->pconnect($this->_host, $this->_port);
 		}
 		else
 		{
-			$result = @static::$_db->connect($host, $port);
+			$result = @static::$_db->connect($this->_host, $this->_port);
 		}
 
 		if (!$result)
@@ -91,31 +119,6 @@ class JCacheStorageMemcache extends JCacheStorage
 
 			throw new JCacheExceptionConnecting('Could not connect to memcache server');
 		}
-	}
-
-	/**
-	 * Get a cache_id string from an id/group pair
-	 *
-	 * @param   string  $id     The cache data id
-	 * @param   string  $group  The cache data group
-	 *
-	 * @return  string   The cache_id string
-	 *
-	 * @since   11.1
-	 */
-	protected function _getCacheId($id, $group)
-	{
-		$prefix   = JCache::getPlatformPrefix();
-		$length   = strlen($prefix);
-		$cache_id = parent::_getCacheId($id, $group);
-
-		if ($length)
-		{
-			// Memcache use suffix instead of prefix
-			$cache_id = substr($cache_id, $length) . strrev($prefix);
-		}
-
-		return $cache_id;
 	}
 
 	/**

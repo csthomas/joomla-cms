@@ -35,7 +35,7 @@ class JCacheStorageFile extends JCacheStorage
 	public function __construct($options = array())
 	{
 		parent::__construct($options);
-		$this->_root = $options['cachebase'];
+		$this->_root = isset($options['cachebase']) ? $options['cachebase'] : JPATH_BASE . '/cache';
 	}
 
 	/**

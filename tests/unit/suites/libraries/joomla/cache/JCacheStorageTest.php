@@ -59,7 +59,7 @@ class JCacheStorageTest extends TestCase
 		$this->setErrorCallback('JCacheStorageTest');
 		self::$actualError = array();
 
-		$this->object = new JCacheStorage;
+		$this->object = JCacheStorage::getInstance('file');
 
 		$this->checkStores();
 
@@ -266,20 +266,12 @@ class JCacheStorageTest extends TestCase
 			'Unexpected value for _locking.'
 		);
 
-		$config = JFactory::getConfig();
-		$lifetime = !is_null($options['lifetime']) ? $options['lifetime'] * 60 : $config->get('cachetime', 1) * 60;
+		$lifetime = !is_null($options['lifetime']) ? $options['lifetime'] * 60 : 60;
+
 		$this->assertThat(
 			$this->object->_lifetime,
-
-			// @todo remove: $this->equalTo(empty($options['lifetime']) ? $config->get('cachetime')*60 : $options['lifetime']*60),
 			$this->equalTo($lifetime),
 			'Unexpected value for _lifetime.'
-		);
-
-		$this->assertLessThan(
-			isset($config->cachetime) ? $config->cachetime : 900,
-			abs($this->object->_now - time()),
-			'Unexpected value for configuration lifetime.'
 		);
 	}
 

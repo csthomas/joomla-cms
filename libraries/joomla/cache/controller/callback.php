@@ -30,6 +30,7 @@ class JCacheControllerCallback extends JCacheController
 	 * @return  mixed  Result of the callback
 	 *
 	 * @since   11.1
+	 * @deprecated  4.0
 	 */
 	public function call()
 	{
@@ -88,89 +89,103 @@ class JCacheControllerCallback extends JCacheController
 
 		$data = $this->cache->get($id);
 
-		$locktest             = new stdClass;
-		$locktest->locked     = null;
-		$locktest->locklooped = null;
+		$lock = (object) array('locked' => null, 'locklooped' => null);
 
 		if ($data === false)
 		{
-			$locktest = $this->cache->lock($id);
+			$lock = $this->cache->lock($id);
 
-			if ($locktest->locked == true && $locktest->locklooped == true)
+			// If locklooped is true try to get the cached data again; it could exist now.
+			if ($lock->locked === true && $lock->locklooped === true)
 			{
 				$data = $this->cache->get($id);
 			}
 		}
 
-		$coptions = array();
-
 		if ($data !== false)
 		{
-			$cached                = unserialize(trim($data));
-			$coptions['mergehead'] = isset($woptions['mergehead']) ? $woptions['mergehead'] : 0;
-			$output                = ($wrkarounds == false) ? $cached['output'] : JCache::getWorkarounds($cached['output'], $coptions);
-			$result                = $cached['result'];
-
-			if ($locktest->locked == true)
+			if ($lock->locked === true)
 			{
 				$this->cache->unlock($id);
 			}
+
+			if ($wrkarounds)
+			{
+				echo static::getWorkarounds(
+					$data['output'],
+					array('mergehead' => isset($woptions['mergehead']) ? $woptions['mergehead'] : 0)
+				);
+			}
+			else
+			{
+				echo $data['output'];
+			}
+
+			return $data['result'];
+		}
+
+		if (!is_array($args))
+		{
+			$referenceArgs = !empty($args) ? array(&$args) : array();
 		}
 		else
 		{
-			if (!is_array($args))
-			{
-				$referenceArgs = !empty($args) ? array(&$args) : array();
-			}
-			else
-			{
-				$referenceArgs = &$args;
-			}
-
-			if ($locktest->locked == false)
-			{
-				$locktest = $this->cache->lock($id);
-			}
-
-			if (isset($woptions['modulemode']) && $woptions['modulemode'] == 1)
-			{
-				$document = JFactory::getDocument();
-				$coptions['modulemode'] = 1;
-				if (method_exists($document, 'getHeadData'))
-				{
-					$coptions['headerbefore'] = $document->getHeadData();
-				}
-			}
-			else
-			{
-				$coptions['modulemode'] = 0;
-			}
-
-			ob_start();
-			ob_implicit_flush(false);
-
-			$result = call_user_func_array($callback, $referenceArgs);
-			$output = ob_get_clean();
-
-			$coptions['nopathway'] = isset($woptions['nopathway']) ? $woptions['nopathway'] : 1;
-			$coptions['nohead']    = isset($woptions['nohead']) ? $woptions['nohead'] : 1;
-			$coptions['nomodules'] = isset($woptions['nomodules']) ? $woptions['nomodules'] : 1;
-
-			$cached = array(
-				'output' => ($wrkarounds == false) ? $output : JCache::setWorkarounds($output, $coptions),
-				'result' => $result,
-			);
-
-			// Store the cache data
-			$this->cache->store(serialize($cached), $id);
-
-			if ($locktest->locked == true)
-			{
-				$this->cache->unlock($id);
-			}
+			$referenceArgs = &$args;
 		}
 
+		if ($lock->locked === false)
+		{
+			// We can not store data because another process is in the middle of saving
+			return call_user_func_array($callback, $referenceArgs);
+		}
+
+		$coptions = array();
+
+		if (isset($woptions['modulemode']) && $woptions['modulemode'] == 1)
+		{
+			$document = JFactory::getDocument();
+
+			if (method_exists($document, 'getHeadData'))
+			{
+				$coptions['headerbefore'] = $document->getHeadData();
+			}
+
+			$coptions['modulemode'] = 1;
+		}
+		else
+		{
+			$coptions['modulemode'] = 0;
+		}
+
+		$coptions['nopathway'] = isset($woptions['nopathway']) ? $woptions['nopathway'] : 1;
+		$coptions['nohead']    = isset($woptions['nohead'])    ? $woptions['nohead'] : 1;
+		$coptions['nomodules'] = isset($woptions['nomodules']) ? $woptions['nomodules'] : 1;
+
+		ob_start();
+		ob_implicit_flush(false);
+
+		$result = call_user_func_array($callback, $referenceArgs);
+		$output = ob_get_clean();
+
+		$data = array(
+			'result' => $result,
+			'output' => &$output,
+		);
+
 		echo $output;
+
+		if ($wrkarounds)
+		{
+			$data['output'] = static::setWorkarounds($output, $coptions);
+		}
+
+		// Store the cache data
+		$this->cache->store($data, $id);
+
+		if ($lock->locked === true)
+		{
+			$this->cache->unlock($id);
+		}
 
 		return $result;
 	}
