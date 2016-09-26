@@ -19,19 +19,6 @@ class JCacheStorageMock extends JCacheStorage
 	private $_storage = array();
 
 	/**
-	 * Constructor
-	 *
-	 * @param   array  $options  optional parameters
-	 */
-	public function __construct($options = array())
-	{
-		parent::__construct($options);
-
-		$config = JFactory::getConfig();
-		$this->_hash = $config->get('secret');
-	}
-
-	/**
 	 * Get cached data by id and group
 	 *
 	 * @param   string   $id         The cache data id
@@ -46,12 +33,7 @@ class JCacheStorageMock extends JCacheStorage
 	{
 		$cache_id = $this->_getCacheId($id, $group);
 
-		if (isset($this->_storage[$id]))
-		{
-			return $this->_storage[$id];
-		}
-
-		return false;
+		return isset($this->_storage[$cache_id]) ? $this->_storage[$cache_id] : false;
 	}
 
 	/**
@@ -69,7 +51,9 @@ class JCacheStorageMock extends JCacheStorage
 	{
 		$cache_id = $this->_getCacheId($id, $group);
 
-		return ($this->_storage[$id] = $data);
+		$this->_storage[$cache_id] = $data;
+
+		return true;
 	}
 
 	/**
@@ -85,7 +69,8 @@ class JCacheStorageMock extends JCacheStorage
 	public function remove($id, $group)
 	{
 		$cache_id = $this->_getCacheId($id, $group);
-		unset($this->_storage[$id]);
+		unset($this->_storage[$cache_id]);
+		return true;
 	}
 
 	/**
@@ -102,7 +87,8 @@ class JCacheStorageMock extends JCacheStorage
 	 */
 	public function clean($group, $mode = null)
 	{
-		return ($this->_storage = array());
+		$this->_storage = array();
+		return true;
 	}
 
 	/**

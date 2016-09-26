@@ -9,8 +9,6 @@
 
 defined('JPATH_PLATFORM') or die;
 
-use Joomla\String\StringHelper;
-
 /**
  * Joomla! Cache base object
  *
@@ -23,6 +21,7 @@ class JCache
 	 *
 	 * @var    JCacheStorage[]
 	 * @since  11.1
+	 * @deprecated  4.0
 	 */
 	public static $_handler = array();
 
@@ -35,6 +34,30 @@ class JCache
 	public $_options;
 
 	/**
+	 * Storage handler
+	 *
+	 * @var    JCacheStorage[]
+	 * @since  __DEPLOY_VERSION__
+	 */
+	protected static $handlers = array();
+
+	/**
+	 * Cache options object.
+	 *
+	 * @var    array
+	 * @since  __DEPLOY_VERSION__
+	 */
+	protected $handler_options;
+
+	/**
+	 * Cache handler signature.
+	 *
+	 * @var    string
+	 * @since  __DEPLOY_VERSION__
+	 */
+	protected $handler_hash;
+
+	/**
 	 * Constructor
 	 *
 	 * @param   array  $options  Cache options
@@ -43,30 +66,73 @@ class JCache
 	 */
 	public function __construct($options)
 	{
-		$conf = JFactory::getConfig();
+		$config = JFactory::getConfig();
 
-		$this->_options = array(
-			'cachebase'    => $conf->get('cache_path', JPATH_CACHE),
-			'lifetime'     => (int) $conf->get('cachetime'),
-			'language'     => $conf->get('language', 'en-GB'),
-			'storage'      => $conf->get('cache_handler', ''),
+		$this->handler_options = [
+			'locking'   => true,
+			'cachebase' => $config->get('cache_path', JPATH_CACHE),
+			'lifetime'  => $config->get('cachetime'),
+			'language'  => $config->get('language', 'en-GB'),
+			'storage'   => $config->get('cache_handler', ''),
+			'caching'   => $config->get('caching') >= 1,
+			'hash'      => md5($config->get('secret')),
+		];
+
+		// Add platform key when Global Config is set to platform specific prefix
+		if ($config->get('cache_platformprefix'))
+		{
+			$webclient = new JApplicationWebClient;
+
+			if ($webclient->mobile)
+			{
+				$this->handler_options['platform_key'] = 'M';
+			}
+		}
+
+		$this->_options = array_merge($this->handler_options, array(
 			'defaultgroup' => 'default',
-			'locking'      => true,
 			'locktime'     => 15,
 			'checkTime'    => true,
-			'caching'      => ($conf->get('caching') >= 1) ? true : false,
-		);
+		));
+
+		if ($this->handler_options['storage'] === 'memcache')
+		{
+			$this->handler_options['memcache_server_host'] = $config->get('memcache_server_host');
+			$this->handler_options['memcache_server_port'] = $config->get('memcache_server_port');
+			$this->handler_options['memcache_persist']     = $config->get('memcache_persist');
+			$this->handler_options['memcache_compress']    = $config->get('memcache_compress');
+		}
+		elseif ($this->handler_options['storage'] === 'memcached')
+		{
+			$this->handler_options['memcached_server_host'] = $config->get('memcached_server_host');
+			$this->handler_options['memcached_server_port'] = $config->get('memcached_server_port');
+			$this->handler_options['memcached_persist']     = $config->get('memcached_persist');
+			$this->handler_options['memcached_compress']    = $config->get('memcached_compress');
+		}
+		elseif ($this->handler_options['storage'] === 'redis')
+		{
+			$this->handler_options['redis_server_host'] = $config->get('redis_server_host');
+			$this->handler_options['redis_server_host'] = $config->get('redis_server_host');
+			$this->handler_options['redis_persist']     = $config->get('redis_persist');
+			$this->handler_options['redis_server_auth'] = $config->get('redis_server_auth');
+			$this->handler_options['redis_server_db']   = $config->get('redis_server_db');
+		}
 
 		// Overwrite default options with given options
 		foreach ($options as $option => $value)
 		{
-			if (isset($options[$option]) && $options[$option] !== '')
+			if ($value !== null && $value !== '')
 			{
-				$this->_options[$option] = $options[$option];
+				if (!in_array($option, ['defaultgroup', 'locktime', 'checkTime', 'browsercache']))
+				{
+					$this->handler_options[$option] = $value;
+				}
+
+				$this->_options[$option] = $value;
 			}
 		}
 
-		if (empty($this->_options['storage']))
+		if (!$this->handler_options['storage'])
 		{
 			$this->setCaching(false);
 		}
@@ -81,9 +147,12 @@ class JCache
 	 * @return  JCacheController
 	 *
 	 * @since   11.1
+	 * @deprecated  4.0  Use JCacheController::getInstance().
 	 */
 	public static function getInstance($type = 'output', $options = array())
 	{
+		JLog::add(__METHOD__ . '() is deprecated. Use JCacheController::getInstance() instead.', JLog::WARNING, 'deprecated');
+
 		return JCacheController::getInstance($type, $options);
 	}
 
@@ -133,17 +202,30 @@ class JCache
 	}
 
 	/**
-	 * Set caching enabled state
+	 * Get the cache storage handler
 	 *
-	 * @param   boolean  $enabled  True to enable caching
+	 * @return  JCacheStorage
 	 *
-	 * @return  void
-	 *
-	 * @since   11.1
+	 * @since   __DEPLOY_VERSION__
 	 */
-	public function setCaching($enabled)
+	protected function getStorage()
 	{
-		$this->_options['caching'] = $enabled;
+		if (!$this->handler_hash)
+		{
+			$this->handler_hash = md5(serialize($this->handler_options));
+		}
+
+		if (isset(static::$handlers[$this->handler_hash]))
+		{
+			return static::$handlers[$this->handler_hash];
+		}
+
+		static::$handlers[$this->handler_hash] = JCacheStorage::getInstance(
+			$this->handler_options['storage'],
+			$this->handler_options
+		);
+
+		return static::$handlers[$this->handler_hash];
 	}
 
 	/**
@@ -155,13 +237,41 @@ class JCache
 	 */
 	public function getCaching()
 	{
-		return $this->_options['caching'];
+		return $this->handler_options['caching'];
 	}
 
 	/**
-	 * Set cache lifetime
+	 * Set caching enabled state
 	 *
-	 * @param   integer  $lt  Cache lifetime
+	 * @param   boolean  $enabled  True to enable caching
+	 *
+	 * @return  void
+	 *
+	 * @since   11.1
+	 */
+	public function setCaching($enabled)
+	{
+		$this->_options['caching'] = $enabled;
+		$this->handler_options['caching'] = $enabled;
+		$this->handler_hash = null;
+	}
+
+	/**
+	 * Get cache lifetime.
+	 *
+	 * @return  integer|float  Cache lifetime in minutes
+	 *
+	 * @since   __DEPLOY_VERSION__
+	 */
+	public function getLifeTime()
+	{
+		return $this->handler_options['lifetime'];
+	}
+
+	/**
+	 * Set cache lifetime.
+	 *
+	 * @param   integer|float  $lt  Cache lifetime in minutes
 	 *
 	 * @return  void
 	 *
@@ -170,6 +280,8 @@ class JCache
 	public function setLifeTime($lt)
 	{
 		$this->_options['lifetime'] = $lt;
+		$this->handler_options['lifetime'] = $lt;
+		$this->handler_hash = null;
 	}
 
 	/**
@@ -190,17 +302,12 @@ class JCache
 		}
 
 		// Get the default group
-		$group = ($group) ? $group : $this->_options['defaultgroup'];
+		$group = $group ?: $this->_options['defaultgroup'];
 
-		// Get the storage
-		$handler = $this->_getStorage();
+		$data = $this->getStorage()->get($id, $group, $this->_options['checkTime']);
 
-		if (!($handler instanceof Exception))
-		{
-			return $handler->get($id, $group, $this->_options['checkTime']);
-		}
-
-		return false;
+		// Trim to fix unserialize errors
+		return $data === false ? false : unserialize(trim($data));
 	}
 
 	/**
@@ -217,15 +324,7 @@ class JCache
 			return false;
 		}
 
-		// Get the storage
-		$handler = $this->_getStorage();
-
-		if (!($handler instanceof Exception))
-		{
-			return $handler->getAll();
-		}
-
-		return false;
+		return $this->getStorage()->getAll();
 	}
 
 	/**
@@ -247,17 +346,10 @@ class JCache
 		}
 
 		// Get the default group
-		$group = ($group) ? $group : $this->_options['defaultgroup'];
+		$group = $group ?: $this->_options['defaultgroup'];
 
 		// Get the storage and store the cached data
-		$handler = $this->_getStorage();
-
-		if (!($handler instanceof Exception))
-		{
-			return $handler->store($id, $group, $data);
-		}
-
-		return false;
+		return $this->getStorage()->store($id, $group, serialize($data));
 	}
 
 	/**
@@ -273,17 +365,9 @@ class JCache
 	public function remove($id, $group = null)
 	{
 		// Get the default group
-		$group = ($group) ? $group : $this->_options['defaultgroup'];
+		$group = $group ?: $this->_options['defaultgroup'];
 
-		// Get the storage
-		$handler = $this->_getStorage();
-
-		if (!($handler instanceof Exception))
-		{
-			return $handler->remove($id, $group);
-		}
-
-		return false;
+		return $this->getStorage()->remove($id, $group);
 	}
 
 	/**
@@ -302,17 +386,9 @@ class JCache
 	public function clean($group = null, $mode = 'group')
 	{
 		// Get the default group
-		$group = ($group) ? $group : $this->_options['defaultgroup'];
+		$group = $group ?: $this->_options['defaultgroup'];
 
-		// Get the storage handler
-		$handler = $this->_getStorage();
-
-		if (!($handler instanceof Exception))
-		{
-			return $handler->clean($group, $mode);
-		}
-
-		return false;
+		return $this->getStorage()->clean($group, $mode);
 	}
 
 	/**
@@ -324,15 +400,7 @@ class JCache
 	 */
 	public function gc()
 	{
-		// Get the storage handler
-		$handler = $this->_getStorage();
-
-		if (!($handler instanceof Exception))
-		{
-			return $handler->gc();
-		}
-
-		return false;
+		return $this->getStorage()->gc();
 	}
 
 	/**
@@ -359,20 +427,19 @@ class JCache
 		}
 
 		// Get the default group
-		$group = ($group) ? $group : $this->_options['defaultgroup'];
+		$group = $group ?: $this->_options['defaultgroup'];
 
 		// Get the default locktime
-		$locktime = ($locktime) ? $locktime : $this->_options['locktime'];
+		$locktime = $locktime ?: $this->_options['locktime'];
 
 		/*
 		 * Allow storage handlers to perform locking on their own
 		 * NOTE drivers with lock need also unlock or unlocking will fail because of false $id
 		 */
-		$handler = $this->_getStorage();
 
-		if (!($handler instanceof Exception) && $this->_options['locking'] == true)
+		if ($this->_options['locking'] == true)
 		{
-			$locked = $handler->lock($id, $group, $locktime);
+			$locked = $this->getStorage()->lock($id, $group, $locktime);
 
 			if ($locked !== false)
 			{
@@ -381,17 +448,16 @@ class JCache
 		}
 
 		// Fallback
-		$curentlifetime = $this->_options['lifetime'];
+		$curentlifetime = $this->getLifeTime();
 
-		// Set lifetime to locktime for storing in children
-		$this->_options['lifetime'] = $locktime;
+		$this->setLifeTime($locktime/60);
 
 		$looptime = $locktime * 10;
 		$id2      = $id . '_lock';
 
 		if ($this->_options['locking'] == true)
 		{
-			$data_lock = $this->get($id2, $group);
+			$data_lock = $this->getStorage()->get($id2, $group, $this->_options['checkTime']);
 		}
 		else
 		{
@@ -414,18 +480,17 @@ class JCache
 				}
 
 				usleep(100);
-				$data_lock = $this->get($id2, $group);
+				$data_lock = $this->getStorage()->get($id2, $group, $this->_options['checkTime']);
 				$lock_counter++;
 			}
 		}
 
 		if ($this->_options['locking'] == true)
 		{
-			$returning->locked = $this->store(1, $id2, $group);
+			$returning->locked = $this->getStorage()->store(1, $id2, $group);
 		}
 
-		// Revert lifetime to previous one
-		$this->_options['lifetime'] = $curentlifetime;
+		$this->setLifeTime($curentlifetime);
 
 		return $returning;
 	}
@@ -450,28 +515,17 @@ class JCache
 		$unlock = false;
 
 		// Get the default group
-		$group = ($group) ? $group : $this->_options['defaultgroup'];
+		$group = $group ?: $this->_options['defaultgroup'];
 
 		// Allow handlers to perform unlocking on their own
-		$handler = $this->_getStorage();
+		$unlocked = $this->getStorage()->unlock($id, $group);
 
-		if (!($handler instanceof Exception))
+		if ($unlocked !== false)
 		{
-			$unlocked = $handler->unlock($id, $group);
-
-			if ($unlocked !== false)
-			{
-				return $unlocked;
-			}
+			return $unlocked;
 		}
 
-		// Fallback
-		if ($this->getCaching())
-		{
-			$unlock = $this->remove($id . '_lock', $group);
-		}
-
-		return $unlock;
+		return $this->remove($id . '_lock', $group);
 	}
 
 	/**
@@ -480,19 +534,19 @@ class JCache
 	 * @return  JCacheStorage
 	 *
 	 * @since   11.1
+	 * @deprecated  4.0  Use JCacheController::getStorage().
 	 */
-	public function &_getStorage()
+	public function _getStorage()
 	{
-		$hash = md5(serialize($this->_options));
+		JLog::add(
+			__METHOD__ . '() is deprecated. Use JCache::getStorage() instead.',
+			JLog::WARNING,
+			'deprecated'
+		);
 
-		if (isset(self::$_handler[$hash]))
-		{
-			return self::$_handler[$hash];
-		}
+		static::$_handler = &static::$handlers;
 
-		self::$_handler[$hash] = JCacheStorage::getInstance($this->_options['storage'], $this->_options);
-
-		return self::$_handler[$hash];
+		return $this->getStorage();
 	}
 
 	/**
@@ -504,70 +558,17 @@ class JCache
 	 * @return  string  Body of cached data
 	 *
 	 * @since   11.1
+	 * @deprecated  4.0  Use JCacheController::getWorkarounds().
 	 */
 	public static function getWorkarounds($data, $options = array())
 	{
-		$app      = JFactory::getApplication();
-		$document = JFactory::getDocument();
-		$body     = null;
+		JLog::add(
+			__METHOD__ . '() is deprecated. Use JCacheController::getWorkarounds() instead.',
+			JLog::WARNING,
+			'deprecated'
+		);
 
-		// Get the document head out of the cache.
-		if (isset($options['mergehead']) && $options['mergehead'] == 1 && isset($data['head']) && !empty($data['head'])
-			&& method_exists($document, 'mergeHeadData'))
-		{
-			$document->mergeHeadData($data['head']);
-		}
-		elseif (isset($data['head']) && method_exists($document, 'setHeadData'))
-		{
-			$document->setHeadData($data['head']);
-		}
-
-		// Get the document MIME encoding out of the cache
-		if (isset($data['mime_encoding']))
-		{
-			$document->setMimeEncoding($data['mime_encoding'], true);
-		}
-
-		// If the pathway buffer is set in the cache data, get it.
-		if (isset($data['pathway']) && is_array($data['pathway']))
-		{
-			// Push the pathway data into the pathway object.
-			$app->getPathway()->setPathway($data['pathway']);
-		}
-
-		// @todo check if the following is needed, seems like it should be in page cache
-		// If a module buffer is set in the cache data, get it.
-		if (isset($data['module']) && is_array($data['module']))
-		{
-			// Iterate through the module positions and push them into the document buffer.
-			foreach ($data['module'] as $name => $contents)
-			{
-				$document->setBuffer($contents, 'module', $name);
-			}
-		}
-
-		// Set cached headers.
-		if (isset($data['headers']) && $data['headers'])
-		{
-			foreach ($data['headers'] as $header)
-			{
-				$app->setHeader($header['name'], $header['value']);
-			}
-		}
-
-		// The following code searches for a token in the cached page and replaces it with the proper token.
-		if (isset($data['body']))
-		{
-			$token       = JSession::getFormToken();
-			$search      = '#<input type="hidden" name="[0-9a-f]{32}" value="1" />#';
-			$replacement = '<input type="hidden" name="' . $token . '" value="1" />';
-
-			$data['body'] = preg_replace($search, $replacement, $data['body']);
-			$body         = $data['body'];
-		}
-
-		// Get the document body out of the cache.
-		return $body;
+		return JCacheController::getWorkarounds($data, $options);
 	}
 
 	/**
@@ -579,159 +580,17 @@ class JCache
 	 * @return  string  Data to be cached
 	 *
 	 * @since   11.1
+	 * @deprecated  4.0  Use JCacheController::setWorkarounds().
 	 */
 	public static function setWorkarounds($data, $options = array())
 	{
-		$loptions = array(
-			'nopathway'  => 0,
-			'nohead'     => 0,
-			'nomodules'  => 0,
-			'modulemode' => 0,
+		JLog::add(
+			__METHOD__ . '() is deprecated. Use JCacheController::setWorkarounds() instead.',
+			JLog::WARNING,
+			'deprecated'
 		);
 
-		if (isset($options['nopathway']))
-		{
-			$loptions['nopathway'] = $options['nopathway'];
-		}
-
-		if (isset($options['nohead']))
-		{
-			$loptions['nohead'] = $options['nohead'];
-		}
-
-		if (isset($options['nomodules']))
-		{
-			$loptions['nomodules'] = $options['nomodules'];
-		}
-
-		if (isset($options['modulemode']))
-		{
-			$loptions['modulemode'] = $options['modulemode'];
-		}
-
-		$app      = JFactory::getApplication();
-		$document = JFactory::getDocument();
-
-		if ($loptions['nomodules'] != 1)
-		{
-			// Get the modules buffer before component execution.
-			$buffer1 = $document->getBuffer();
-
-			if (!is_array($buffer1))
-			{
-				$buffer1 = array();
-			}
-
-			// Make sure the module buffer is an array.
-			if (!isset($buffer1['module']) || !is_array($buffer1['module']))
-			{
-				$buffer1['module'] = array();
-			}
-		}
-
-		// View body data
-		$cached['body'] = $data;
-
-		// Document head data
-		if ($loptions['nohead'] != 1 && method_exists($document, 'getHeadData'))
-		{
-			if ($loptions['modulemode'] == 1)
-			{
-				$headnow = $document->getHeadData();
-				$unset   = array('title', 'description', 'link', 'links', 'metaTags');
-
-				foreach ($unset as $un)
-				{
-					unset($headnow[$un]);
-					unset($options['headerbefore'][$un]);
-				}
-
-				$cached['head'] = array();
-
-				// Only store what this module has added
-				foreach ($headnow as $now => $value)
-				{
-					if (isset($options['headerbefore'][$now]))
-					{
-						// We have to serialize the content of the arrays because the may contain other arrays which is a notice in PHP 5.4 and newer
-						$nowvalue    = array_map('serialize', $headnow[$now]);
-						$beforevalue = array_map('serialize', $options['headerbefore'][$now]);
-
-						$newvalue = array_diff_assoc($nowvalue, $beforevalue);
-						$newvalue = array_map('unserialize', $newvalue);
-
-						// Special treatment for script and style declarations.
-						if (($now == 'script' || $now == 'style') && is_array($newvalue) && is_array($options['headerbefore'][$now]))
-						{
-							foreach ($newvalue as $type => $currentScriptStr)
-							{
-								if (isset($options['headerbefore'][$now][strtolower($type)]))
-								{
-									$oldScriptStr = $options['headerbefore'][$now][strtolower($type)];
-
-									if ($oldScriptStr != $currentScriptStr)
-									{
-										// Save only the appended declaration.
-										$newvalue[strtolower($type)] = StringHelper::substr($currentScriptStr, StringHelper::strlen($oldScriptStr));
-									}
-								}
-							}
-						}
-					}
-					else
-					{
-						$newvalue = $headnow[$now];
-					}
-
-					if (!empty($newvalue))
-					{
-						$cached['head'][$now] = $newvalue;
-					}
-				}
-			}
-			else
-			{
-				$cached['head'] = $document->getHeadData();
-			}
-		}
-
-		// Document MIME encoding
-		$cached['mime_encoding'] = $document->getMimeEncoding();
-
-		// Pathway data
-		if ($app->isSite() && $loptions['nopathway'] != 1)
-		{
-			$cached['pathway'] = is_array($data) && isset($data['pathway']) ? $data['pathway'] : $app->getPathway()->getPathway();
-		}
-
-		if ($loptions['nomodules'] != 1)
-		{
-			// @todo Check if the following is needed, seems like it should be in page cache
-			// Get the module buffer after component execution.
-			$buffer2 = $document->getBuffer();
-
-			if (!is_array($buffer2))
-			{
-				$buffer2 = array();
-			}
-
-			// Make sure the module buffer is an array.
-			if (!isset($buffer2['module']) || !is_array($buffer2['module']))
-			{
-				$buffer2['module'] = array();
-			}
-
-			// Compare the second module buffer against the first buffer.
-			$cached['module'] = array_diff_assoc($buffer2['module'], $buffer1['module']);
-		}
-
-		// Headers data
-		if (isset($options['headers']) && $options['headers'])
-		{
-			$cached['headers'] = $app->getHeaders();
-		}
-
-		return $cached;
+		return JCacheController::setWorkarounds($data, $options);
 	}
 
 	/**
@@ -788,9 +647,12 @@ class JCache
 	 * @return  string
 	 *
 	 * @since   3.5
+	 * @deprecated  4.0
 	 */
 	public static function getPlatformPrefix()
 	{
+		JLog::add(__METHOD__ . '() is deprecated.', JLog::WARNING, 'deprecated');
+
 		// No prefix when Global Config is set to no platfom specific prefix
 		if (!JFactory::getConfig()->get('cache_platformprefix', '0'))
 		{
@@ -815,6 +677,7 @@ class JCache
 	 * @return  array   An array with directory elements
 	 *
 	 * @since   11.1
+	 * @deprecated  4.0
 	 */
 	public static function addIncludePath($path = '')
 	{

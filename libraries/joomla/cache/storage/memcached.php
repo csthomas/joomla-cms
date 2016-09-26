@@ -26,12 +26,36 @@ class JCacheStorageMemcached extends JCacheStorage
 	protected static $_db = null;
 
 	/**
-	 * Payload compression level
+	 * Service host
+	 *
+	 * @var    string
+	 * @since  __DEPLOY_VERSION__
+	 */
+	protected $_host;
+
+	/**
+	 * Service port number
 	 *
 	 * @var    integer
+	 * @since  __DEPLOY_VERSION__
+	 */
+	protected $_port;
+
+	/**
+	 * Connection type
+	 *
+	 * @var    boolean
 	 * @since  12.1
 	 */
-	protected $_compress = 0;
+	protected $_persistent = true;
+
+	/**
+	 * Payload compression status
+	 *
+	 * @var    boolean
+	 * @since  12.1
+	 */
+	protected $_compress = false;
 
 	/**
 	 * Constructor
@@ -44,7 +68,17 @@ class JCacheStorageMemcached extends JCacheStorage
 	{
 		parent::__construct($options);
 
-		$this->_compress = JFactory::getConfig()->get('memcached_compress', false) ? Memcached::OPT_COMPRESSION : 0;
+		$this->_host       = isset($options['memcached_server_host']) ?
+			$options['memcached_server_host'] : 'localhost';
+
+		$this->_port       = isset($options['memcached_server_port']) ?
+			$options['memcached_server_port'] : 11211;
+
+		$this->_persistent = isset($options['memcached_persist']) ?
+			(bool) $options['memcached_persist'] : true;
+
+		$this->_compress   = isset($options['memcached_compress']) ?
+			(bool) $options['memcached_compress'] : false;
 
 		if (static::$_db === null)
 		{
@@ -58,28 +92,23 @@ class JCacheStorageMemcached extends JCacheStorage
 	 * @return  void
 	 *
 	 * @since   12.1
-	 * @throws  RuntimeException
+	 * @throws  JCacheExceptionUnsupported
 	 */
 	protected function getConnection()
 	{
+		// This is the second check of that.
 		if (!static::isSupported())
 		{
-			throw new RuntimeException('Memcached Extension is not available');
+			throw new JCacheExceptionUnsupported('The Memcached Cache Storage is not supported on this platform.');
 		}
 
-		$config = JFactory::getConfig();
-
-		$host = $config->get('memcached_server_host', 'localhost');
-		$port = $config->get('memcached_server_port', 11211);
-
-
 		// Create the memcached connection
-		if ($config->get('memcached_persist', true))
+		if ($this->_persistent)
 		{
 			static::$_db = new Memcached($this->_hash);
 			$servers = static::$_db->getServerList();
 
-			if ($servers && ($servers[0]['host'] != $host || $servers[0]['port'] != $port))
+			if ($servers && ($servers[0]['host'] != $this->_host || $servers[0]['port'] != $this->_port))
 			{
 				static::$_db->resetServerList();
 				$servers = array();
@@ -87,52 +116,30 @@ class JCacheStorageMemcached extends JCacheStorage
 
 			if (!$servers)
 			{
-				static::$_db->addServer($host, $port);
+				static::$_db->addServer($this->_host, $this->_port);
 			}
 		}
 		else
 		{
 			static::$_db = new Memcached;
-			static::$_db->addServer($host, $port);
+			static::$_db->addServer($this->_host, $this->_port);
 		}
 
 		static::$_db->setOption(Memcached::OPT_COMPRESSION, $this->_compress);
 
 		$stats  = static::$_db->getStats();
-		$result = !empty($stats["$host:$port"]) && $stats["$host:$port"]['pid'] > 0;
+		$name   = "$this->_host:$this->_port";
 
-		if (!$result)
+		if (empty($stats[$name]) || $stats[$name]['pid'] <= 0)
 		{
-			// Null out the connection to inform the constructor it will need to attempt to connect if this class is instantiated again
+			/*
+			 * Null out the connection to inform the constructor it will need
+			 * to attempt to connect if this class is instantiated again.
+			 */
 			static::$_db = null;
 
 			throw new JCacheExceptionConnecting('Could not connect to memcached server');
 		}
-	}
-
-	/**
-	 * Get a cache_id string from an id/group pair
-	 *
-	 * @param   string  $id     The cache data id
-	 * @param   string  $group  The cache data group
-	 *
-	 * @return  string   The cache_id string
-	 *
-	 * @since   11.1
-	 */
-	protected function _getCacheId($id, $group)
-	{
-		$prefix   = JCache::getPlatformPrefix();
-		$length   = strlen($prefix);
-		$cache_id = parent::_getCacheId($id, $group);
-
-		if ($length)
-		{
-			// Memcached use suffix instead of prefix
-			$cache_id = substr($cache_id, $length) . strrev($prefix);
-		}
-
-		return $cache_id;
 	}
 
 	/**

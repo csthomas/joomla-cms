@@ -190,12 +190,12 @@ class JCacheTest extends TestCase
 	{
 		$this->object = JCache::getInstance($handler, $options);
 
-		$caching = (bool) $this->object->options['caching'];
+		$caching = (bool) $this->object->getCaching();
 		$toggled = !$caching;
 		$this->object->setCaching($toggled);
 		$this->assertEquals(
 			$toggled,
-			$this->object->options['caching']
+			$this->object->getCaching()
 		);
 	}
 
@@ -254,7 +254,7 @@ class JCacheTest extends TestCase
 		$this->object->setLifeTime($lifetime);
 		$this->assertEquals(
 			$lifetime,
-			$this->object->options['lifetime']
+			$this->object->getLifetime()
 		);
 	}
 

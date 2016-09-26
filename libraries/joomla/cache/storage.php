@@ -9,6 +9,8 @@
 
 defined('JPATH_PLATFORM') or die;
 
+use Joomla\Registry\Registry;
+
 /**
  * Abstract cache storage handler
  *
@@ -74,6 +76,14 @@ class JCacheStorage
 	public $_hash;
 
 	/**
+	 * Platform specified key
+	 *
+	 * @var    string
+	 * @since  __DEPLOY_VERSION__
+	 */
+	public $_platform_key;
+
+	/**
 	 * Constructor
 	 *
 	 * @param   array  $options  Optional parameters
@@ -82,26 +92,33 @@ class JCacheStorage
 	 */
 	public function __construct($options = array())
 	{
-		$config = JFactory::getConfig();
+		// Deprecated 4.0
+		if (!isset($options['hash']))
+		{
+			$config = JFactory::getConfig();
+			$options['hash'] = md5($config->get('secret'));
+		}
 
-		$this->_hash        = md5($config->get('secret'));
-		$this->_application = (isset($options['application'])) ? $options['application'] : null;
-		$this->_language    = (isset($options['language'])) ? $options['language'] : 'en-GB';
-		$this->_locking     = (isset($options['locking'])) ? $options['locking'] : true;
-		$this->_lifetime    = (isset($options['lifetime'])) ? $options['lifetime'] * 60 : $config->get('cachetime') * 60;
-		$this->_now         = (isset($options['now'])) ? $options['now'] : time();
+		// Deprecated 4.0
+		if (!isset($options['platform_key']))
+		{
+			$options['platform_key'] = JCache::getPlatformPrefix();
+		}
+
+		$this->_hash         = isset($options['hash']) ? $options['hash'] : null;
+		$this->_platform_key = isset($options['platform_key']) ? $options['platform_key'] : '';
+		$this->_application  = isset($options['application']) ? $options['application'] : null;
+		$this->_language     = isset($options['language']) ? $options['language'] : 'en-GB';
+		$this->_locking      = isset($options['locking']) ? $options['locking'] : true;
+		$this->_now          = isset($options['now']) ? $options['now'] : time();
+		$this->_lifetime     = isset($options['lifetime']) ? $options['lifetime'] : 1;
+
+		// Convert minutes to seconds.
+		$this->_lifetime     = $this->_lifetime ? $this->_lifetime * 60 : 60;
 
 		// Set time threshold value.  If the lifetime is not set, default to 60 (0 is BAD)
 		// _threshold is now available ONLY as a legacy (it's deprecated).  It's no longer used in the core.
-		if (empty($this->_lifetime))
-		{
-			$this->_threshold = $this->_now - 60;
-			$this->_lifetime = 60;
-		}
-		else
-		{
-			$this->_threshold = $this->_now - $this->_lifetime;
-		}
+		$this->_threshold = $this->_now - $this->_lifetime;
 	}
 
 	/**
@@ -126,11 +143,6 @@ class JCacheStorage
 		if (!isset($handler))
 		{
 			$handler = JFactory::getConfig()->get('cache_handler');
-
-			if (empty($handler))
-			{
-				throw new UnexpectedValueException('Cache Storage Handler not set.');
-			}
 		}
 
 		if (is_null($now))
@@ -143,6 +155,11 @@ class JCacheStorage
 		// We can't cache this since options may change...
 		$handler = strtolower(preg_replace('/[^A-Z0-9_\.-]/i', '', $handler));
 
+		if (empty($handler))
+		{
+			throw new UnexpectedValueException('Cache Storage Handler not set.');
+		}
+
 		/** @var JCacheStorage $class */
 		$class = 'JCacheStorage' . ucfirst($handler);
 
@@ -153,12 +170,10 @@ class JCacheStorage
 
 			$path = JPath::find(self::addIncludePath(), strtolower($handler) . '.php');
 
-			if ($path === false)
+			if ($path !== false)
 			{
-				throw new JCacheExceptionUnsupported(sprintf('Unable to load Cache Storage: %s', $handler));
+				include_once $path;
 			}
-
-			include_once $path;
 
 			// The class should now be loaded
 			if (!class_exists($class))
@@ -170,7 +185,9 @@ class JCacheStorage
 		// Validate the cache storage is supported on this platform
 		if (!$class::isSupported())
 		{
-			throw new JCacheExceptionUnsupported(sprintf('The %s Cache Storage is not supported on this platform.', $handler));
+			throw new JCacheExceptionUnsupported(
+				sprintf('The %s Cache Storage is not supported on this platform.', $handler)
+			);
 		}
 
 		return new $class($options);
@@ -350,7 +367,13 @@ class JCacheStorage
 		$name          = md5($this->_application . '-' . $id . '-' . $this->_language);
 		$this->rawname = $this->_hash . '-' . $name;
 
-		return JCache::getPlatformPrefix() . $this->_hash . '-cache-' . $group . '-' . $name;
+		if ($this->_platform_key)
+		{
+			// Suffix is better for storages like memcache(d), redis, apc(u)
+			return $this->_hash . '-cache-' . $group . '-' . $name . '-' . $this->_platform_key;
+		}
+
+		return $this->_hash . '-cache-' . $group . '-' . $name;
 	}
 
 	/**
