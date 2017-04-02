@@ -340,9 +340,26 @@ abstract class JDatabaseDriver extends JDatabase implements JDatabaseInterface
 		$open = false;
 		$comment = false;
 		$endString = '';
-		$end = strlen($sql);
 		$queries = array();
 		$query = '';
+
+		// Get first line only
+		$line = strstr($sql, "\n", true);
+
+		// Check for custom delimiter, only one character allowed
+		if (stripos($line, 'DELIMITER ') === 0)
+		{
+			$delimiter = trim(substr($line, 10));
+
+			// Skip whole delimiter line
+			$sql = substr($sql, 12);
+		}
+		else
+		{
+			$delimiter = ';';
+		}
+
+		$end = strlen($sql);
 
 		for ($i = 0; $i < $end; $i++)
 		{
@@ -421,20 +438,17 @@ abstract class JDatabaseDriver extends JDatabase implements JDatabaseInterface
 				$start = $i + 1;
 			}
 
-			if (($current == ';' && !$open) || $i == $end - 1)
+			if (($current == $delimiter && !$open) || $i == $end - 1)
 			{
 				if ($start <= $i)
 				{
 					$query = $query . substr($sql, $start, ($i - $start + 1));
 				}
-				$query = trim($query);
+
+				$query = trim($query, " \t\r\n\0\x0B$delimiter");
 
 				if ($query)
 				{
-					if (($i == $end - 1) && ($current != ';'))
-					{
-						$query = $query . ';';
-					}
 					$queries[] = $query;
 				}
 
@@ -1851,6 +1865,17 @@ abstract class JDatabaseDriver extends JDatabase implements JDatabaseInterface
 			return '\'' . ($escape ? $this->escape($text) : $text) . '\'';
 		}
 	}
+
+	/**
+	 * Quotes a binary string to database requirements for use in database queries.
+	 *
+	 * @param   mixed  $text  A binary string to quote.
+	 *
+	 * @return  string  The binary quoted input string.
+	 *
+	 * @since   __DEPLOY_VERSION__
+	 */
+	abstract public function quoteBinary($text);
 
 	/**
 	 * Wrap an SQL statement identifier name such as column, table or database names in quotes to prevent injection

@@ -1005,7 +1005,7 @@ class JApplication extends JApplicationBase
 			// but fires the query less than half the time.
 			$query = $db->getQuery(true)
 				->delete($db->quoteName('#__session'))
-				->where($db->quoteName('time') . ' < ' . $db->quote((int) ($time - $session->getExpire())));
+				->where($db->quoteName('time') . ' < ' . (int) ($time - $session->getExpire()));
 
 			$db->setQuery($query);
 			$db->execute();
@@ -1040,10 +1040,12 @@ class JApplication extends JApplicationBase
 		$session = JFactory::getSession();
 		$user = JFactory::getUser();
 
+		$sessionId = $session->getDatabaseSessionId();
+
 		$query = $db->getQuery(true)
 			->select($db->quoteName('session_id'))
 			->from($db->quoteName('#__session'))
-			->where($db->quoteName('session_id') . ' = ' . $db->quote($session->getId()));
+			->where($db->quoteName('session_id') . ' = ' . $db->quoteBinary($sessionId));
 
 		$db->setQuery($query, 0, 1);
 		$exists = $db->loadResult();
@@ -1057,7 +1059,7 @@ class JApplication extends JApplicationBase
 			{
 				$query->insert($db->quoteName('#__session'))
 					->columns($db->quoteName('session_id') . ', ' . $db->quoteName('client_id') . ', ' . $db->quoteName('time'))
-					->values($db->quote($session->getId()) . ', ' . (int) $this->getClientId() . ', ' . $db->quote((int) time()));
+					->values($db->quoteBinary($sessionId) . ', ' . (int) $this->getClientId() . ', ' . (int) time());
 				$db->setQuery($query);
 			}
 			else
@@ -1068,8 +1070,8 @@ class JApplication extends JApplicationBase
 						$db->quoteName('time') . ', ' . $db->quoteName('userid') . ', ' . $db->quoteName('username')
 					)
 					->values(
-						$db->quote($session->getId()) . ', ' . (int) $this->getClientId() . ', ' . (int) $user->get('guest') . ', ' .
-						$db->quote((int) $session->get('session.timer.start')) . ', ' . (int) $user->get('id') . ', ' . $db->quote($user->get('username'))
+						$db->quoteBinary($sessionId) . ', ' . (int) $this->getClientId() . ', ' . (int) $user->get('guest') . ', ' .
+						(int) $session->get('session.timer.start') . ', ' . (int) $user->get('id') . ', ' . $db->quote($user->get('username'))
 					);
 
 				$db->setQuery($query);

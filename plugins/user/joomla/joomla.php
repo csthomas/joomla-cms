@@ -225,7 +225,7 @@ class PlgUserJoomla extends JPlugin
 		$session = JFactory::getSession();
 
 		// Grab the current session ID
-		$oldSessionId = $session->getId();
+		$oldSessionId = $session->getDatabaseSessionId();
 
 		// Fork the session
 		$session->fork();
@@ -238,7 +238,7 @@ class PlgUserJoomla extends JPlugin
 		// Purge the old session
 		$query = $this->db->getQuery(true)
 			->delete('#__session')
-			->where($this->db->quoteName('session_id') . ' = ' . $this->db->quote($oldSessionId));
+			->where($this->db->quoteName('session_id') . ' = ' . $this->db->quoteBinary($oldSessionId));
 
 		try
 		{
