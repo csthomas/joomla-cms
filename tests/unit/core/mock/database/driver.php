@@ -81,6 +81,7 @@ class TestMockDatabaseDriver
 			'lockTable',
 			'query',
 			'quote',
+			'quoteBinary',
 			'quoteName',
 			'renameTable',
 			'replacePrefix',

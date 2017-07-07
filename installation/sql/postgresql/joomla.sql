@@ -1654,13 +1654,13 @@ CREATE TABLE "#__schemas" (
 --
 
 CREATE TABLE "#__session" (
-  "session_id" varchar(200) DEFAULT '' NOT NULL,
+  "session_id" bytea NOT NULL,
   "client_id" smallint DEFAULT NULL,
-  "guest" smallint DEFAULT 1,
-  "time" varchar(14) DEFAULT '',
+  "guest" smallint DEFAULT 1 NOT NULL,
+  "time" bigint DEFAULT 0 NOT NULL,
   "data" text,
-  "userid" bigint DEFAULT 0,
-  "username" varchar(150) DEFAULT '',
+  "userid" bigint DEFAULT 0 NOT NULL,
+  "username" varchar(150) DEFAULT '' NOT NULL,
   PRIMARY KEY ("session_id")
 );
 CREATE INDEX "#__session_userid" ON "#__session" ("userid");

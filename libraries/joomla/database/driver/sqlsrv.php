@@ -283,6 +283,20 @@ class JDatabaseDriverSqlsrv extends JDatabaseDriver
 	}
 
 	/**
+	 * Quotes a binary string to database requirements for use in database queries.
+	 *
+	 * @param   mixed  $text  A binary string to quote.
+	 *
+	 * @return  string  The binary quoted input string.
+	 *
+	 * @since   __DEPLOY_VERSION__
+	 */
+	public function quoteBinary($text)
+	{
+		return '0x' . bin2hex($text);
+	}
+
+	/**
 	 * Determines if the connection to the server is active.
 	 *
 	 * @return  boolean  True if connected to the database engine.

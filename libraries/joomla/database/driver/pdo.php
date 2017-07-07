@@ -362,6 +362,20 @@ abstract class JDatabaseDriverPdo extends JDatabaseDriver
 	}
 
 	/**
+	 * Quotes a binary string to database requirements for use in database queries.
+	 *
+	 * @param   mixed  $text  A binary string to quote.
+	 *
+	 * @return  string  The binary quoted input string.
+	 *
+	 * @since   __DEPLOY_VERSION__
+	 */
+	public function quoteBinary($text)
+	{
+		return 'x\'' . bin2hex($text) . '\'';
+	}
+
+	/**
 	 * Execute the SQL statement.
 	 *
 	 * @return  mixed  A database cursor resource on success, boolean false on failure.

@@ -167,10 +167,12 @@ class JApplicationCms extends JApplicationWeb
 		$session = JFactory::getSession();
 		$user = JFactory::getUser();
 
+		$sessionId = $session->getDatabaseSessionId();
+
 		$query = $db->getQuery(true)
 			->select($db->quoteName('session_id'))
 			->from($db->quoteName('#__session'))
-			->where($db->quoteName('session_id') . ' = ' . $db->quote($session->getId()));
+			->where($db->quoteName('session_id') . ' = ' . $db->quoteBinary($sessionId));
 
 		$db->setQuery($query, 0, 1);
 		$exists = $db->loadResult();
@@ -191,9 +193,9 @@ class JApplicationCms extends JApplicationWeb
 			);
 
 			$values = array(
-				$db->quote($session->getId()),
+				$db->quoteBinary($sessionId),
 				(int) $user->guest,
-				$db->quote((int) $time),
+				(int) $time,
 				(int) $user->id,
 				$db->quote($user->username),
 			);
@@ -816,7 +818,7 @@ class JApplicationCms extends JApplicationWeb
 			// but fires the query less than half the time.
 			$query = $db->getQuery(true)
 				->delete($db->quoteName('#__session'))
-				->where($db->quoteName('time') . ' < ' . $db->quote((int) ($time - $session->getExpire())));
+				->where($db->quoteName('time') . ' < ' . (int) ($time - $session->getExpire()));
 
 			$db->setQuery($query);
 			$db->execute();

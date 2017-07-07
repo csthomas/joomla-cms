@@ -349,7 +349,7 @@ class JSession implements IteratorAggregate
 	/**
 	 * Get session id
 	 *
-	 * @return  string  The session name
+	 * @return  string  The session id
 	 *
 	 * @since   11.1
 	 */
@@ -362,6 +362,26 @@ class JSession implements IteratorAggregate
 		}
 
 		return $this->_handler->getId();
+	}
+
+	/**
+	 * Get database session id
+	 *
+	 * @return  string  The database session id
+	 *
+	 * @since   __DEPLOY_VERSION__
+	 */
+	public function getDatabaseSessionId()
+	{
+		if ($this->getState() === 'destroyed')
+		{
+			// @TODO : raise error
+			return;
+		}
+
+		$sessionId = $this->_handler->getId();
+
+		return base64_decode(strtr($sessionId, '-,', '+/') . str_repeat('A', (4 - strlen($sessionId) % 4) % 4));
 	}
 
 	/**

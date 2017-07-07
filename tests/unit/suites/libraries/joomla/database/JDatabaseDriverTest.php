@@ -202,8 +202,37 @@ class JDatabaseDriverTest extends TestCaseDatabase
 			$db::splitSql('SELECT * FROM #__foo;SELECT * FROM #__bar;'),
 			$this->equalTo(
 				array(
-					'SELECT * FROM #__foo;',
-					'SELECT * FROM #__bar;'
+					'SELECT * FROM #__foo',
+					'SELECT * FROM #__bar'
+				)
+			),
+			'splitSql method should split a string of multiple queries into an array.'
+		);
+	}
+
+	/**
+	 * Tests the JDatabaseDriver::splitSql method.
+	 *
+	 * @return  void
+	 *
+	 * @since   __DEPLOY_VERSION__
+	 */
+	public function testSplitSqlWithMysqlDelimiter()
+	{
+		$db = $this->db;
+
+		$queries = "DELIMITER |\n"
+			. "SELECT * FROM #__foo |\n"
+			. "CREATE FUNCTION A (input INT) BEGIN DECLARE x INT; RETURN x; END |\n"
+			. "SELECT * FROM #__bar";
+
+		$this->assertThat(
+			$db::splitSql($queries),
+			$this->equalTo(
+				array(
+					'SELECT * FROM #__foo',
+					'CREATE FUNCTION A (input INT) BEGIN DECLARE x INT; RETURN x; END',
+					'SELECT * FROM #__bar'
 				)
 			),
 			'splitSql method should split a string of multiple queries into an array.'
