@@ -190,6 +190,13 @@ class ContentModelCategory extends JModelList
 		if (($app->input->get('layout') === 'blog') || $params->get('layout_type') === 'blog')
 		{
 			$limit = $params->get('num_leading_articles') + $params->get('num_intro_articles') + $params->get('num_links');
+
+			if ($limit === 0)
+			{
+				// We want 0 articles but 0 means no limit
+				$limit = -1;
+			}
+
 			$this->setState('list.links', $params->get('num_links'));
 		}
 		else
