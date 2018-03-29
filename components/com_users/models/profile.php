@@ -251,7 +251,7 @@ class UsersModelProfile extends JModelForm
 		{
 			$form->loadFile('frontend', false);
 
-			if (JFactory::getUser()->authorise('core.login.admin'))
+			if (JFactory::getUser()->isAuthorised('core.login.admin'))
 			{
 				$form->loadFile('frontend_admin', false);
 			}

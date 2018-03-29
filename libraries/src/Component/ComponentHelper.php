@@ -10,7 +10,7 @@ namespace Joomla\CMS\Component;
 
 defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Access\Access;
+use Joomla\CMS\Access\AccessControl;
 use Joomla\CMS\Component\Exception\MissingComponentException;
 use Joomla\Registry\Registry;
 
@@ -120,7 +120,7 @@ class ComponentHelper
 		// Filter settings
 		$config     = static::getParams('com_config');
 		$user       = \JFactory::getUser();
-		$userGroups = Access::getGroupsByUser($user->get('id'));
+		$userGroups = AccessControl::getGroupsByUser($user->get('id'));
 
 		$filters = $config->get('filters');
 

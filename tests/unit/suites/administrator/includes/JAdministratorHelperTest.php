@@ -33,7 +33,7 @@ class JAdministratorHelperTest extends TestCase
 
 		JFactory::$application = $this->getMockCmsApp();
 		JFactory::$application->input = $this->getMockInput();
-		$this->user = $this->getMockBuilder('JUser')->setMethods(array('get', 'authorise'))->getMock();
+		$this->user = $this->getMockBuilder('JUser')->setMethods(array('get', 'isAuthorised'))->getMock();
 
 		JFactory::$application->expects($this->once())
 			->method('getIdentity')
@@ -63,7 +63,7 @@ class JAdministratorHelperTest extends TestCase
 			->willReturn(true);
 
 		$this->user->expects($this->never())
-			->method('authorise');
+			->method('isAuthorised');
 
 		$this->assertEquals(
 			'com_login',
@@ -89,7 +89,7 @@ class JAdministratorHelperTest extends TestCase
 			->willReturn(false);
 
 		$this->user->expects($this->once())
-			->method('authorise')
+			->method('isAuthorised')
 			->with($this->equalTo('core.login.admin'))
 			->willReturn(false);
 
@@ -117,7 +117,7 @@ class JAdministratorHelperTest extends TestCase
 			->willReturn(false);
 
 		$this->user->expects($this->once())
-			->method('authorise')
+			->method('isAuthorised')
 			->with($this->equalTo('core.login.admin'))
 			->willReturn(true);
 
@@ -145,7 +145,7 @@ class JAdministratorHelperTest extends TestCase
 			->willReturn(false);
 
 		$this->user->expects($this->once())
-			->method('authorise')
+			->method('isAuthorised')
 			->with($this->equalTo('core.login.admin'))
 			->willReturn(false);
 

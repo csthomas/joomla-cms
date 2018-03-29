@@ -9,6 +9,8 @@
 
 defined('_JEXEC') or die;
 
+use Joomla\CMS\Access\AccessControl;
+
 JModelLegacy::addIncludePath(JPATH_ADMINISTRATOR . '/components/com_content/models', 'ContentModel');
 
 /**
@@ -33,7 +35,7 @@ abstract class ModPopularHelper
 		$model = JModelLegacy::getInstance('Articles', 'ContentModel', array('ignore_request' => true));
 
 		// Set List SELECT
-		$model->setState('list.select', 'a.id, a.title, a.checked_out, a.checked_out_time, ' .
+		$model->setState('list.select', 'a.id, a.asset_id, a.title, a.checked_out, a.checked_out_time, ' .
 				' a.created, a.hits');
 
 		// Set Ordering filter
@@ -76,10 +78,18 @@ abstract class ModPopularHelper
 			return false;
 		}
 
-		// Set the links
-		foreach ($items as &$item)
+		foreach ($items as $item)
 		{
-			if ($user->authorise('core.edit', 'com_content.article.' . $item->id))
+			// Set to preload all assets in one sql query.
+			AccessControl::addAssetIdToPreload($item->asset_id ?: $item->category_asset_id);
+		}
+
+		// Set the links
+		foreach ($items as $item)
+		{
+			$assetId = $item->asset_id ?: $item->category_asset_id;
+
+			if ($user->isAuthorised('core.edit', 'com_content', $assetId))
 			{
 				$item->link = JRoute::_('index.php?option=com_content&task=article.edit&id=' . $item->id);
 			}

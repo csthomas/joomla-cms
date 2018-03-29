@@ -10,7 +10,7 @@ namespace Joomla\CMS\User;
 
 defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Access\Access;
+use Joomla\CMS\Access\AccessControl;
 use Joomla\CMS\Plugin\PluginHelper;
 use Joomla\CMS\Table\Table;
 use Joomla\Registry\Registry;
@@ -360,8 +360,35 @@ class User extends \JObject
 	 * @return  boolean  True if authorised
 	 *
 	 * @since   11.1
+	 * @deprecated  4.0  Use User::isAuthorised instead.
 	 */
 	public function authorise($action, $assetname = null)
+	{
+		if ($assetname && !is_numeric($assetname))
+		{
+			list($extension) = explode('.', $assetname, 2);
+		}
+		else
+		{
+			$extension = null;
+		}
+
+		return $this->isAuthorised($action, $extension, $assetname, true);
+	}
+
+	/**
+	 * Method to check User object authorisation against an access control
+	 * object and optionally an access extension object
+	 *
+	 * @param   string           $action    The name of the action to check for permission.
+	 * @param   integer|string   $assetKey  The name of the asset on which to perform the action.
+	 * @param   boolean|integer  $nested    Indicates the level of optimalization. If True then default.
+	 *
+	 * @return  boolean  True if authorised
+	 *
+	 * @since   __DEPLOY_VERSION__
+	 */
+	public function isAuthorised($action, $extension = null, $assetKey = null, $nested = true)
 	{
 		// Make sure we only check for core.admin once during the run.
 		if ($this->isRoot === null)
@@ -386,7 +413,7 @@ class User extends \JObject
 				$identities = $this->getAuthorisedGroups();
 				array_unshift($identities, $this->id * -1);
 
-				if (Access::getAssetRules(1)->allow('core.admin', $identities))
+				if (AccessControl::getAssetRules(null, 1)->allow('core.admin', $identities))
 				{
 					$this->isRoot = true;
 
@@ -395,7 +422,12 @@ class User extends \JObject
 			}
 		}
 
-		return $this->isRoot ? true : (bool) Access::check($this->id, $action, $assetname);
+		if ($this->isRoot === true)
+		{
+			return true;
+		}
+
+		return AccessControl::check($this->id, $action, $extension, $assetKey, $nested);
 	}
 
 	/**
@@ -411,26 +443,26 @@ class User extends \JObject
 	public function getAuthorisedCategories($component, $action)
 	{
 		// Brute force method: get all published category rows for the component and check each one
-		// TODO: Modify the way permissions are stored in the db to allow for faster implementation and better scaling
 		$db = \JFactory::getDbo();
 
-		$subQuery = $db->getQuery(true)
-			->select('id,asset_id')
+		$query = $db->getQuery(true)
+			->select('id, asset_id')
 			->from('#__categories')
 			->where('extension = ' . $db->quote($component))
 			->where('published = 1');
 
-		$query = $db->getQuery(true)
-			->select('c.id AS id, a.name AS asset_name')
-			->from('(' . (string) $subQuery . ') AS c')
-			->join('INNER', '#__assets AS a ON c.asset_id = a.id');
-		$db->setQuery($query);
-		$allCategories = $db->loadObjectList('id');
+		$allCategories = $db->loadObjectList();
 		$allowedCategories = array();
 
 		foreach ($allCategories as $category)
 		{
-			if ($this->authorise($action, $category->asset_name))
+			// Add assets to prelaod
+			AccessControl::addAssetIdToPreload($category->asset_id);
+		}
+
+		foreach ($allCategories as $category)
+		{
+			if ($this->isAuthorised($action, $component, $category->asset_id))
 			{
 				$allowedCategories[] = (int) $category->id;
 			}
@@ -455,7 +487,7 @@ class User extends \JObject
 
 		if (empty($this->_authLevels))
 		{
-			$this->_authLevels = Access::getAuthorisedViewLevels($this->id);
+			$this->_authLevels = AccessControl::getAuthorisedViewLevels($this->id);
 		}
 
 		return $this->_authLevels;
@@ -477,7 +509,7 @@ class User extends \JObject
 
 		if (empty($this->_authGroups))
 		{
-			$this->_authGroups = Access::getGroupsByUser($this->id);
+			$this->_authGroups = AccessControl::getGroupsByUser($this->id);
 		}
 
 		return $this->_authGroups;
@@ -495,7 +527,7 @@ class User extends \JObject
 		$this->_authLevels = null;
 		$this->_authGroups = null;
 		$this->isRoot = null;
-		Access::clearStatics();
+		AccessControl::clearStatics();
 	}
 
 	/**
@@ -778,7 +810,7 @@ class User extends \JObject
 			if ($iAmSuperAdmin != true && $iAmRehashingSuperadmin != true)
 			{
 				// I am not a Super Admin, and this one is, so fail.
-				if (!$isNew && Access::check($this->id, 'core.admin'))
+				if (!$isNew && AccessControl::check($this->id, 'core.admin'))
 				{
 					throw new \RuntimeException('User not Super Administrator');
 				}
@@ -788,7 +820,7 @@ class User extends \JObject
 					// I am not a Super Admin and I'm trying to make one.
 					foreach ($this->groups as $groupId)
 					{
-						if (Access::checkGroup($groupId, 'core.admin'))
+						if (AccessControl::checkGroup($groupId, 'core.admin'))
 						{
 							throw new \RuntimeException('User not Super Administrator');
 						}

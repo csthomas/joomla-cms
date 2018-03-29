@@ -164,8 +164,8 @@ class JAdminCssMenu
 	protected function check($items, Registry $params)
 	{
 		$me          = JFactory::getUser();
-		$authMenus   = $me->authorise('core.manage', 'com_menus');
-		$authModules = $me->authorise('core.manage', 'com_modules');
+		$authMenus   = $me->isAuthorised('core.manage', 'com_menus');
+		$authModules = $me->isAuthorised('core.manage', 'com_modules');
 
 		if (!$authMenus && !$authModules)
 		{
@@ -314,7 +314,7 @@ class JAdminCssMenu
 
 				list($assetName) = isset($query['context']) ? explode('.', $query['context'], 2) : array('com_fields');
 			}
-			elseif ($item->element === 'com_config' && !$user->authorise('core.admin'))
+			elseif ($item->element === 'com_config' && !$user->isAuthorised('core.admin'))
 			{
 				continue;
 			}
@@ -322,13 +322,13 @@ class JAdminCssMenu
 			{
 				parse_str($item->link, $query);
 
-				if (isset($query['view']) && $query['view'] === 'sysinfo' && !$user->authorise('core.admin'))
+				if (isset($query['view']) && $query['view'] === 'sysinfo' && !$user->isAuthorised('core.admin'))
 				{
 					continue;
 				}
 			}
 
-			if ($assetName && !$user->authorise(($item->scope === 'edit') ? 'core.create' : 'core.manage', $assetName))
+			if ($assetName && !$user->isAuthorised(($item->scope === 'edit') ? 'core.create' : 'core.manage', $assetName))
 			{
 				continue;
 			}

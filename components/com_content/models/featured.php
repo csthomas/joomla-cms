@@ -70,7 +70,7 @@ class ContentModelFeatured extends ContentModelArticles
 
 		$this->setState('filter.frontpage', true);
 
-		if ((!$user->authorise('core.edit.state', 'com_content')) &&  (!$user->authorise('core.edit', 'com_content')))
+		if ((!$user->isAuthorised('core.edit.state', 'com_content')) &&  (!$user->isAuthorised('core.edit', 'com_content')))
 		{
 			// Filter on published for those who do not have edit or edit.state rights.
 			$this->setState('filter.published', 1);

@@ -92,16 +92,35 @@ class ContentModelForm extends ContentModelArticle
 		// Compute selected asset permissions.
 		$user   = JFactory::getUser();
 		$userId = $user->get('id');
-		$asset  = 'com_content.article.' . $value->id;
+
+		if ($return)
+		{
+			if ($value->asset_id)
+			{
+				$assetId = $value->asset_id;
+			}
+			else
+			{
+				// Fallback to category asset_id if article asset_id is not set.
+				$category = JCategories::getInstance('Content')->get($value->catid);
+
+				// If category is missing then fallback to content assets.
+				$assetId = $category ? $category->asset_id : null;
+			}
+		}
+		else
+		{
+			$assetId = null;
+		}
 
 		// Check general edit permission first.
-		if ($user->authorise('core.edit', $asset))
+		if ($user->isAuthorised('core.edit', 'com_content', $assetId))
 		{
 			$value->params->set('access-edit', true);
 		}
 
 		// Now check if edit.own is available.
-		elseif (!empty($userId) && $user->authorise('core.edit.own', $asset))
+		elseif (!empty($userId) && $user->isAuthorised('core.edit.own', 'com_content', $assetId))
 		{
 			// Check for a valid user and that they are the owner.
 			if ($userId == $value->created_by)
@@ -114,7 +133,7 @@ class ContentModelForm extends ContentModelArticle
 		if ($itemId)
 		{
 			// Existing item
-			$value->params->set('access-change', $user->authorise('core.edit.state', $asset));
+			$value->params->set('access-change', $user->isAuthorised('core.edit.state', 'com_content', $assetId));
 		}
 		else
 		{
@@ -123,12 +142,12 @@ class ContentModelForm extends ContentModelArticle
 
 			if ($catId)
 			{
-				$value->params->set('access-change', $user->authorise('core.edit.state', 'com_content.category.' . $catId));
+				$value->params->set('access-change', $user->isAuthorised('core.edit.state', 'com_content', 'com_content.category.' . $catId));
 				$value->catid = $catId;
 			}
 			else
 			{
-				$value->params->set('access-change', $user->authorise('core.edit.state', 'com_content'));
+				$value->params->set('access-change', $user->isAuthorised('core.edit.state', 'com_content'));
 			}
 		}
 

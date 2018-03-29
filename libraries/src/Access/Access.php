@@ -416,17 +416,14 @@ class Access
 			}
 		}
 
-		// Get the database connection object.
-		$db = \JFactory::getDbo();
+		$refClass = new \ReflectionClass('\Joomla\CMS\Access\AccessControl');
+		$refMethod = $refClass->getMethod('preloadComponents');
+		$refMethod->setAccessible(true);
+		$refMethod->invoke(null);
 
-		// Get the asset info for all assets in asset names list.
-		$query = $db->getQuery(true)
-			->select($db->qn(array('id', 'name', 'rules', 'parent_id')))
-			->from($db->qn('#__assets'))
-			->where($db->qn('name') . ' IN (' . implode(',', $db->quote($components)) . ')');
-
-		// Get the Name Permission Map List
-		$assets = $db->setQuery($query)->loadObjectList();
+		$refProp = $refClass->getProperty('assets');
+		$refProp->setAccessible(true);
+		$assets = $refProp->getValue();
 
 		$rootAsset = null;
 
@@ -933,66 +930,7 @@ class Access
 
 		if (!isset(self::$groupsByUser[$storeId]))
 		{
-			// TODO: Uncouple this from \JComponentHelper and allow for a configuration setting or value injection.
-			if (class_exists('\JComponentHelper'))
-			{
-				$guestUsergroup = \JComponentHelper::getParams('com_users')->get('guest_usergroup', 1);
-			}
-			else
-			{
-				$guestUsergroup = 1;
-			}
-
-			// Guest user (if only the actually assigned group is requested)
-			if (empty($userId) && !$recursive)
-			{
-				$result = array($guestUsergroup);
-			}
-			// Registered user and guest if all groups are requested
-			else
-			{
-				$db = \JFactory::getDbo();
-
-				// Build the database query to get the rules for the asset.
-				$query = $db->getQuery(true)
-					->select($recursive ? 'b.id' : 'a.id');
-
-				if (empty($userId))
-				{
-					$query->from('#__usergroups AS a')
-						->where('a.id = ' . (int) $guestUsergroup);
-				}
-				else
-				{
-					$query->from('#__user_usergroup_map AS map')
-						->where('map.user_id = ' . (int) $userId)
-						->join('LEFT', '#__usergroups AS a ON a.id = map.group_id');
-				}
-
-				// If we want the rules cascading up to the global asset node we need a self-join.
-				if ($recursive)
-				{
-					$query->join('LEFT', '#__usergroups AS b ON b.lft <= a.lft AND b.rgt >= a.rgt');
-				}
-
-				// Execute the query and load the rules from the result.
-				$db->setQuery($query);
-				$result = $db->loadColumn();
-
-				// Clean up any NULL or duplicate values, just in case
-				$result = ArrayHelper::toInteger($result);
-
-				if (empty($result))
-				{
-					$result = array('1');
-				}
-				else
-				{
-					$result = array_unique($result);
-				}
-			}
-
-			self::$groupsByUser[$storeId] = $result;
+			self::$groupsByUser[$storeId] = AccessControl::getGroupsByUser($userId, $recursive);
 		}
 
 		return self::$groupsByUser[$storeId];
@@ -1125,14 +1063,14 @@ class Access
 	 * @return  array  List of actions available for the given component and section.
 	 *
 	 * @since       11.1
-	 * @deprecated  12.3 (Platform) & 4.0 (CMS)  Use Access::getActionsFromFile or Access::getActionsFromData instead.
+	 * @deprecated  12.3 (Platform) & 4.0 (CMS)  Use AccessControl::getActionsFromFile or AccessControl::getActionsFromData instead.
 	 * @codeCoverageIgnore
 	 */
 	public static function getActions($component, $section = 'component')
 	{
-		\JLog::add(__METHOD__ . ' is deprecated. Use Access::getActionsFromFile or Access::getActionsFromData instead.', \JLog::WARNING, 'deprecated');
+		\JLog::add(__METHOD__ . ' is deprecated. Use AccessControl::getActionsFromFile or AccessControl::getActionsFromData instead.', \JLog::WARNING, 'deprecated');
 
-		$actions = self::getActionsFromFile(
+		$actions = AccessControl::getActionsFromFile(
 			JPATH_ADMINISTRATOR . '/components/' . $component . '/access.xml',
 			"/access/section[@name='" . $section . "']/"
 		);
@@ -1156,21 +1094,13 @@ class Access
 	 * @return  boolean|array   False if case of error or the list of actions available.
 	 *
 	 * @since   12.1
+	 * @deprecated  4.0  Use AccessControl::getActionsFromFile instead.
 	 */
 	public static function getActionsFromFile($file, $xpath = "/access/section[@name='component']/")
 	{
-		if (!is_file($file) || !is_readable($file))
-		{
-			// If unable to find the file return false.
-			return false;
-		}
-		else
-		{
-			// Else return the actions from the xml.
-			$xml = simplexml_load_file($file);
+		\JLog::add(__METHOD__ . ' is deprecated. Use AccessControl::getActionsFromFile instead.', \JLog::WARNING, 'deprecated');
 
-			return self::getActionsFromData($xml, $xpath);
-		}
+		return AccessControl::getActionsFromFile($file, $xpath);
 	}
 
 	/**
@@ -1182,55 +1112,12 @@ class Access
 	 * @return  boolean|array   False if case of error or the list of actions available.
 	 *
 	 * @since   12.1
+	 * @deprecated  4.0  Use AccessControl::getActionsFromData instead.
 	 */
 	public static function getActionsFromData($data, $xpath = "/access/section[@name='component']/")
 	{
-		// If the data to load isn't already an XML element or string return false.
-		if ((!($data instanceof \SimpleXMLElement)) && (!is_string($data)))
-		{
-			return false;
-		}
+		\JLog::add(__METHOD__ . ' is deprecated. Use AccessControl::getActionsFromData instead.', \JLog::WARNING, 'deprecated');
 
-		// Attempt to load the XML if a string.
-		if (is_string($data))
-		{
-			try
-			{
-				$data = new \SimpleXMLElement($data);
-			}
-			catch (\Exception $e)
-			{
-				return false;
-			}
-
-			// Make sure the XML loaded correctly.
-			if (!$data)
-			{
-				return false;
-			}
-		}
-
-		// Initialise the actions array
-		$actions = array();
-
-		// Get the elements from the xpath
-		$elements = $data->xpath($xpath . 'action[@name][@title][@description]');
-
-		// If there some elements, analyse them
-		if (!empty($elements))
-		{
-			foreach ($elements as $action)
-			{
-				// Add the action to the actions array
-				$actions[] = (object) array(
-					'name' => (string) $action['name'],
-					'title' => (string) $action['title'],
-					'description' => (string) $action['description'],
-				);
-			}
-		}
-
-		// Finally return the actions array
-		return $actions;
+		return AccessControl::getActionsFromData($data, $xpath);
 	}
 }

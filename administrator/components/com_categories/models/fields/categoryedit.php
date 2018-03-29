@@ -9,6 +9,7 @@
 
 defined('JPATH_BASE') or die;
 
+use Joomla\CMS\Access\AccessControl;
 use Joomla\Utilities\ArrayHelper;
 
 JFormHelper::loadFieldClass('list');
@@ -252,6 +253,8 @@ class JFormFieldCategoryEdit extends JFormFieldList
 			{
 				$options[$i]->text = $options[$i]->text . ' (' . $options[$i]->language . ')';
 			}
+
+			AccessControl::addAssetNameToPreload($extension . '.category.' . $options[$i]->value);
 		}
 
 		// For new items we want a list of categories you are allowed to create in.

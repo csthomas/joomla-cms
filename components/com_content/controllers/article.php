@@ -10,6 +10,7 @@
 defined('_JEXEC') or die;
 
 use Joomla\Utilities\ArrayHelper;
+use Joomla\CMS\Categories\Categories;
 
 /**
  * Content article class.
@@ -88,7 +89,7 @@ class ContentControllerArticle extends JControllerForm
 		if ($categoryId)
 		{
 			// If the category has been passed in the data or URL check it.
-			$allow = $user->authorise('core.create', 'com_content.category.' . $categoryId);
+			$allow = $user->isAuthorised('core.create', 'com_content', 'com_content.category.' . $categoryId);
 		}
 
 		if ($allow === null)
@@ -123,23 +124,35 @@ class ContentControllerArticle extends JControllerForm
 			return parent::allowEdit($data, $key);
 		}
 
+		// Existing record already has an owner, get it
+		$record = $this->getModel()->getItem($recordId);
+
+		if (empty($record))
+		{
+			return false;
+		}
+
+		$assetId = $record->asset_id;
+
+		if (!$assetId)
+		{
+			$category = Categories::getInstance('Content')->get($record->catid);
+
+			if ($category)
+			{
+				$assetId = $category->asset_id;
+			}
+		}
+
 		// Check edit on the record asset (explicit or inherited)
-		if ($user->authorise('core.edit', 'com_content.article.' . $recordId))
+		if ($user->isAuthorised('core.edit', 'com_content', $assetId))
 		{
 			return true;
 		}
 
 		// Check edit own on the record asset (explicit or inherited)
-		if ($user->authorise('core.edit.own', 'com_content.article.' . $recordId))
+		if ($user->isAuthorised('core.edit.own', 'com_content', $assetId))
 		{
-			// Existing record already has an owner, get it
-			$record = $this->getModel()->getItem($recordId);
-
-			if (empty($record))
-			{
-				return false;
-			}
-
 			// Grant if current user is owner of the record
 			return $user->get('id') == $record->created_by;
 		}

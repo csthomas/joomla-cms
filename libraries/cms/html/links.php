@@ -113,7 +113,7 @@ abstract class JHtmlLinks
 				// Take each pair of permission, context values.
 				for ($i = 0, $n = count($link['access']); $i < $n; $i += 2)
 				{
-					if (!$user->authorise($link['access'][$i], $link['access'][$i + 1]))
+					if (!$user->isAuthorised($link['access'][$i], $link['access'][$i + 1]))
 					{
 						return '';
 					}

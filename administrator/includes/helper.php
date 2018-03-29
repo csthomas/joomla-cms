@@ -33,7 +33,7 @@ class JAdministratorHelper
 		$app->loadIdentity();
 		$user = $app->getIdentity();
 
-		if ($user->get('guest') || !$user->authorise('core.login.admin'))
+		if ($user->get('guest') || !$user->isAuthorised('core.login.admin'))
 		{
 			$option = 'com_login';
 		}

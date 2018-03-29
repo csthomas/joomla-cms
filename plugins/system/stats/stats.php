@@ -354,7 +354,7 @@ class PlgSystemStats extends JPlugin
 	 */
 	private function isAllowedUser()
 	{
-		return JFactory::getUser()->authorise('core.admin');
+		return JFactory::getUser()->isAuthorised('core.admin');
 	}
 
 	/**

@@ -52,7 +52,7 @@ class ContentModelArticle extends JModelItem
 		// TODO: Tune these values based on other permissions.
 		$user = JFactory::getUser();
 
-		if ((!$user->authorise('core.edit.state', 'com_content')) && (!$user->authorise('core.edit', 'com_content')))
+		if ((!$user->isAuthorised('core.edit.state', 'com_content')) && (!$user->isAuthorised('core.edit', 'com_content')))
 		{
 			$this->setState('filter.published', 1);
 			$this->setState('filter.archived', 2);
@@ -100,7 +100,7 @@ class ContentModelArticle extends JModelItem
 					->where('a.id = ' . (int) $pk);
 
 				// Join on category table.
-				$query->select('c.title AS category_title, c.alias AS category_alias, c.access AS category_access')
+				$query->select('c.title AS category_title, c.alias AS category_alias, c.access AS category_access, c.asset_id AS category_asset_id')
 					->innerJoin('#__categories AS c on c.id = a.catid')
 					->where('c.published > 0');
 
@@ -122,7 +122,7 @@ class ContentModelArticle extends JModelItem
 				$query->select('ROUND(v.rating_sum / v.rating_count, 0) AS rating, v.rating_count as rating_count')
 					->join('LEFT', '#__content_rating AS v ON a.id = v.content_id');
 
-				if ((!$user->authorise('core.edit.state', 'com_content')) && (!$user->authorise('core.edit', 'com_content')))
+				if ((!$user->isAuthorised('core.edit.state', 'com_content')) && (!$user->isAuthorised('core.edit', 'com_content')))
 				{
 					// Filter by start and end dates.
 					$nullDate = $db->quote($db->getNullDate());
@@ -170,16 +170,18 @@ class ContentModelArticle extends JModelItem
 				if (!$user->get('guest'))
 				{
 					$userId = $user->get('id');
-					$asset = 'com_content.article.' . $data->id;
+
+					// Fallback to category asset_id if article asset_id is not set.
+					$assetId = $data->asset_id ?: $data->category_asset_id;
 
 					// Check general edit permission first.
-					if ($user->authorise('core.edit', $asset))
+					if ($user->isAuthorised('core.edit', 'com_content', $assetId))
 					{
 						$data->params->set('access-edit', true);
 					}
 
 					// Now check if edit.own is available.
-					elseif (!empty($userId) && $user->authorise('core.edit.own', $asset))
+					elseif (!empty($userId) && $user->isAuthorised('core.edit.own', 'com_content', $assetId))
 					{
 						// Check for a valid user and that they are the owner.
 						if ($userId == $data->created_by)

@@ -9,6 +9,7 @@
 
 defined('_JEXEC') or die;
 
+use Joomla\CMS\Access\AccessControl;
 use Joomla\Utilities\ArrayHelper;
 
 /**
@@ -189,7 +190,14 @@ class ModulesModelModules extends JModelList
 				$this->setState('list.start', 0);
 			}
 
-			return array_slice($result, $limitstart, $limit ?: null);
+			$result = array_slice($result, $limitstart, $limit ?: null);
+
+			foreach ($result as $item)
+			{
+				AccessControl::addAssetIdToPreload($item->asset_id, false);
+			}
+
+			return $result;
 		}
 
 		// If ordering by fields that doesn't need translate just order the query.
@@ -210,6 +218,11 @@ class ModulesModelModules extends JModelList
 
 		// Process pagination.
 		$result = parent::_getList($query, $limitstart, $limit);
+
+		foreach ($result as $item)
+		{
+			AccessControl::addAssetIdToPreload($item->asset_id, false);
+		}
 
 		// Translate the results.
 		$this->translate($result);
@@ -273,7 +286,7 @@ class ModulesModelModules extends JModelList
 		$query->select(
 			$this->getState(
 				'list.select',
-				'a.id, a.title, a.note, a.position, a.module, a.language,' .
+				'a.id, a.asset_id, a.title, a.note, a.position, a.module, a.language,' .
 					'a.checked_out, a.checked_out_time, a.published AS published, e.enabled AS enabled, a.access, a.ordering, a.publish_up, a.publish_down'
 			)
 		);

@@ -10,8 +10,8 @@ namespace Joomla\CMS\Helper;
 
 defined('JPATH_PLATFORM') or die;
 
+use Joomla\CMS\Access\AccessControl;
 use Joomla\CMS\Application\ApplicationHelper;
-use Joomla\CMS\Access\Access;
 use Joomla\CMS\Component\ComponentHelper;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Language\LanguageHelper;
@@ -81,7 +81,7 @@ class ContentHelper
 			$assetName .= '.article.' . (int) $id;
 		}
 
-		$actions = Access::getActionsFromFile($path, "/access/section[@name='" . $section . "']/");
+		$actions = AccessControl::getActionsFromFile($path, "/access/section[@name='" . $section . "']/");
 
 		foreach ($actions as $action)
 		{
@@ -123,7 +123,7 @@ class ContentHelper
 
 		$user = Factory::getUser();
 
-		$actions = Access::getActionsFromFile(
+		$actions = AccessControl::getActionsFromFile(
 			JPATH_ADMINISTRATOR . '/components/' . $component . '/access.xml', '/access/section[@name="component"]/'
 		);
 

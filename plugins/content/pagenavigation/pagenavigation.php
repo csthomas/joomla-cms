@@ -9,6 +9,8 @@
 
 defined('_JEXEC') or die;
 
+use Joomla\CMS\Access\AccessControl;
+
 /**
  * Pagenavigation plugin class.
  *
@@ -50,8 +52,8 @@ class PlgContentPagenavigation extends JPlugin
 			$now  = $date->toSql();
 
 			$uid        = $row->id;
-			$option     = 'com_content';
-			$canPublish = $user->authorise('core.edit.state', $option . '.article.' . $row->id);
+			$assetId    = $row->asset_id ?: $row->category_asset_id;
+			$canPublish = $user->isAuthorised('core.edit.state', 'com_content', $assetId);
 
 			/**
 			 * The following is needed as different menu items types utilise a different param to control ordering.
@@ -146,7 +148,7 @@ class PlgContentPagenavigation extends JPlugin
 
 			$query->where(
 					'a.catid = ' . (int) $row->catid . ' AND a.state = ' . (int) $row->state
-						. ($canPublish ? '' : ' AND a.access IN (' . implode(',', JAccess::getAuthorisedViewLevels($user->id)) . ') ') . $xwhere
+						. ($canPublish ? '' : ' AND a.access IN (' . implode(',', AccessControl::getAuthorisedViewLevels($user->id)) . ') ') . $xwhere
 				);
 			$query->order($orderby);
 

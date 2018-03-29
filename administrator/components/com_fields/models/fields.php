@@ -227,7 +227,7 @@ class FieldsModelFields extends JModelList
 		}
 
 		// Implement View Level Access
-		if (!$app->isClient('administrator') || !$user->authorise('core.admin'))
+		if (!$app->isClient('administrator') || !$user->isAuthorised('core.admin'))
 		{
 			$groups = implode(',', $user->getAuthorisedViewLevels());
 			$query->where('a.access IN (' . $groups . ') AND (a.group_id = 0 OR g.access IN (' . $groups . '))');

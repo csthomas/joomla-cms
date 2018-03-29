@@ -9,6 +9,7 @@
 
 defined('_JEXEC') or die;
 
+use Joomla\CMS\Access\AccessControl;
 use Joomla\Utilities\ArrayHelper;
 
 /**
@@ -186,7 +187,7 @@ class ContentModelArticles extends JModelList
 		$query->select(
 			$this->getState(
 				'list.select',
-				'DISTINCT a.id, a.title, a.alias, a.checked_out, a.checked_out_time, a.catid' .
+				'DISTINCT a.id, a.asset_id, a.title, a.alias, a.checked_out, a.checked_out_time, a.catid' .
 				', a.state, a.access, a.created, a.created_by, a.created_by_alias, a.modified, a.ordering, a.featured, a.language, a.hits' .
 				', a.publish_up, a.publish_down'
 			)
@@ -206,7 +207,7 @@ class ContentModelArticles extends JModelList
 			->join('LEFT', '#__viewlevels AS ag ON ag.id = a.access');
 
 		// Join over the categories.
-		$query->select('c.title AS category_title')
+		$query->select('c.title AS category_title, c.asset_id AS category_asset_id')
 			->join('LEFT', '#__categories AS c ON c.id = a.catid');
 
 		// Join over the users for the author.
@@ -248,7 +249,7 @@ class ContentModelArticles extends JModelList
 		}
 
 		// Filter by access level on categories.
-		if (!$user->authorise('core.admin'))
+		if (!$user->isAuthorised('core.admin'))
 		{
 			$groups = implode(',', $user->getAuthorisedViewLevels());
 			$query->where('a.access IN (' . $groups . ')');
@@ -434,6 +435,11 @@ class ContentModelArticles extends JModelList
 					unset($items[$x]);
 				}
 			}
+		}
+
+		foreach ($items as $item)
+		{
+			AccessControl::addAssetIdToPreload($item->asset_id ?: $item->category_asset_id);
 		}
 
 		return $items;

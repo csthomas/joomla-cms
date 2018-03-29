@@ -89,10 +89,10 @@ $colSpan = $clientId === 1 ? 8 : 10;
 				<tbody>
 				<?php foreach ($this->items as $i => $item) :
 					$ordering   = ($listOrder == 'a.ordering');
-					$canCreate  = $user->authorise('core.create',     'com_modules');
-					$canEdit	= $user->authorise('core.edit',		  'com_modules.module.' . $item->id);
-					$canCheckin = $user->authorise('core.manage',     'com_checkin') || $item->checked_out == $user->get('id')|| $item->checked_out == 0;
-					$canChange  = $user->authorise('core.edit.state', 'com_modules.module.' . $item->id) && $canCheckin;
+					$canCreate  = $user->isAuthorised('core.create', 'com_modules');
+					$canEdit	= $user->isAuthorised('core.edit', 'com_modules', $item->asset_id);
+					$canCheckin = $user->isAuthorised('core.manage', 'com_checkin') || $item->checked_out == $user->get('id')|| $item->checked_out == 0;
+					$canChange  = $user->isAuthorised('core.edit.state', 'com_modules', $item->asset_id) && $canCheckin;
 				?>
 					<tr class="row<?php echo $i % 2; ?>" sortable-group-id="<?php echo $item->position ?: 'none'; ?>">
 						<td class="order nowrap center hidden-phone">

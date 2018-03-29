@@ -29,7 +29,7 @@ $user = JFactory::getUser();
 		</div>
 	<?php endif; ?>
 	<div class="span<?php echo $iconmodules ? 9 : 12; ?>">
-		<?php if ($user->authorise('core.manage', 'com_postinstall') && $this->postinstall_message_count) : ?>
+		<?php if ($user->isAuthorised('core.manage', 'com_postinstall') && $this->postinstall_message_count) : ?>
 			<div class="row-fluid">
 				<div class="alert alert-info">
 					<h4>

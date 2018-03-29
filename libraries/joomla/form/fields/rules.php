@@ -9,11 +9,13 @@
 
 defined('JPATH_PLATFORM') or die;
 
+use Joomla\CMS\Access\AccessControl;
+
 /**
  * Form Field class for the Joomla Platform.
  * Field for assigning permissions to groups for a given asset
  *
- * @see    JAccess
+ * @see    AccessControl
  * @since  11.1
  */
 class JFormFieldRules extends JFormField
@@ -163,7 +165,10 @@ class JFormFieldRules extends JFormField
 		$isGlobalConfig = $component === 'root.1';
 
 		// Get the actions for the asset.
-		$actions = JAccess::getActions($component, $section);
+		$actions = AccessControl::getActionsFromFile(
+			JPATH_ADMINISTRATOR . '/components/' . $component . '/access.xml',
+			"/access/section[@name='" . $section . "']/"
+		);
 
 		// Iterate over the children and add to the actions.
 		foreach ($this->element->children() as $el)
@@ -225,7 +230,7 @@ class JFormFieldRules extends JFormField
 		// Full width format.
 
 		// Get the rules for just this asset (non-recursive).
-		$assetRules = JAccess::getAssetRules($assetId, false, false);
+		$assetRules = AccessControl::getAssetRules(null, $assetId, false, false);
 
 		// Get the available user groups.
 		$groups = $this->getUserGroups();
@@ -289,7 +294,7 @@ class JFormFieldRules extends JFormField
 			$html[] = '<tbody>';
 
 			// Check if this group has super user permissions
-			$isSuperUserGroup = JAccess::checkGroup($group->value, 'core.admin');
+			$isSuperUserGroup = AccessControl::checkGroup($group->value, null, 'core.admin');
 
 			foreach ($actions as $action)
 			{
@@ -339,9 +344,9 @@ class JFormFieldRules extends JFormField
 				$result = array();
 
 				// Get the group, group parent id, and group global config recursive calculated permission for the chosen action.
-				$inheritedGroupRule            = JAccess::checkGroup((int) $group->value, $action->name, $assetId);
-				$inheritedGroupParentAssetRule = !empty($parentAssetId) ? JAccess::checkGroup($group->value, $action->name, $parentAssetId) : null;
-				$inheritedParentGroupRule      = !empty($group->parent_id) ? JAccess::checkGroup($group->parent_id, $action->name, $assetId) : null;
+				$inheritedGroupRule            = AccessControl::checkGroup((int) $group->value, $action->name, null, $assetId);
+				$inheritedGroupParentAssetRule = !empty($parentAssetId) ? AccessControl::checkGroup($group->value, $action->name, null, $parentAssetId) : null;
+				$inheritedParentGroupRule      = !empty($group->parent_id) ? AccessControl::checkGroup($group->parent_id, $action->name, null, $assetId) : null;
 
 				// Current group is a Super User group, so calculated setting is "Allowed (Super User)".
 				if ($isSuperUserGroup)

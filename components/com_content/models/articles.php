@@ -9,6 +9,7 @@
 
 defined('_JEXEC') or die;
 
+use Joomla\CMS\Access\AccessControl;
 use Joomla\Registry\Registry;
 use Joomla\String\StringHelper;
 use Joomla\Utilities\ArrayHelper;
@@ -110,7 +111,7 @@ class ContentModelArticles extends JModelList
 		$this->setState('params', $params);
 		$user = JFactory::getUser();
 
-		if ((!$user->authorise('core.edit.state', 'com_content')) && (!$user->authorise('core.edit', 'com_content')))
+		if ((!$user->isAuthorised('core.edit.state', 'com_content')) && (!$user->isAuthorised('core.edit', 'com_content')))
 		{
 			// Filter on published for those who do not have edit or edit.state rights.
 			$this->setState('filter.published', 1);
@@ -188,7 +189,7 @@ class ContentModelArticles extends JModelList
 		$query->select(
 			$this->getState(
 				'list.select',
-				'a.id, a.title, a.alias, a.introtext, a.fulltext, ' .
+				'a.id, a.asset_id, a.title, a.alias, a.introtext, a.fulltext, ' .
 				'a.checked_out, a.checked_out_time, ' .
 				'a.catid, a.created, a.created_by, a.created_by_alias, ' .
 				// Published/archived article in archive category is treats as archive article
@@ -229,7 +230,8 @@ class ContentModelArticles extends JModelList
 		}
 
 		// Join over the categories.
-		$query->select('c.title AS category_title, c.path AS category_route, c.access AS category_access, c.alias AS category_alias')
+		$query->select('c.title AS category_title, c.path AS category_route, c.alias AS category_alias')
+			->select('c.access AS category_access, c.asset_id AS category_asset_id')
 			->select('c.published, c.published AS parents_published, c.lft')
 			->join('LEFT', '#__categories AS c ON c.id = a.catid');
 
@@ -437,7 +439,7 @@ class ContentModelArticles extends JModelList
 		$nowDate  = $db->quote(JFactory::getDate()->toSql());
 
 		// Filter by start and end dates.
-		if ((!$user->authorise('core.edit.state', 'com_content')) && (!$user->authorise('core.edit', 'com_content')))
+		if ((!$user->isAuthorised('core.edit.state', 'com_content')) && (!$user->isAuthorised('core.edit', 'com_content')))
 		{
 			$query->where('(a.publish_up = ' . $nullDate . ' OR a.publish_up <= ' . $nowDate . ')')
 				->where('(a.publish_down = ' . $nullDate . ' OR a.publish_down >= ' . $nowDate . ')');
@@ -563,6 +565,12 @@ class ContentModelArticles extends JModelList
 		$groups = $user->getAuthorisedViewLevels();
 		$input  = JFactory::getApplication()->input;
 
+		foreach ($items as $item)
+		{
+			// Add assets to preload list
+			AccessControl::addAssetIdToPreload($item->asset_id ?: $item->category_asset_id);
+		}
+
 		// Get the global params
 		$globalParams = JComponentHelper::getParams('com_content', true);
 
@@ -643,16 +651,17 @@ class ContentModelArticles extends JModelList
 			 */
 			if (!$guest)
 			{
-				$asset = 'com_content.article.' . $item->id;
+				// Fallback to category asset_id if article asset_id is not set.
+				$assetId = $item->asset_id ?: $item->category_asset_id;
 
 				// Check general edit permission first.
-				if ($user->authorise('core.edit', $asset))
+				if ($user->isAuthorised('core.edit', 'com_content', $assetId))
 				{
 					$item->params->set('access-edit', true);
 				}
 
 				// Now check if edit.own is available.
-				elseif (!empty($userId) && $user->authorise('core.edit.own', $asset))
+				elseif (!empty($userId) && $user->isAuthorised('core.edit.own', 'com_content', $assetId))
 				{
 					// Check for a valid user and that they are the owner.
 					if ($userId == $item->created_by)

@@ -129,14 +129,15 @@ class ContentModelCategory extends JModelList
 		$this->setState('params', $mergedParams);
 		$user  = JFactory::getUser();
 
-		$asset = 'com_content';
+		$assetKey = 'com_content';
 
 		if ($pk)
 		{
-			$asset .= '.category.' . $pk;
+			$assetKey .= '.category.' . $pk;
 		}
 
-		if ((!$user->authorise('core.edit.state', $asset)) &&  (!$user->authorise('core.edit', $asset)))
+		if (!$user->isAuthorised('core.edit.state', 'com_content', $assetKey)
+			&& !$user->isAuthorised('core.edit', 'com_content', $assetKey))
 		{
 			// Limit to published for people who can't edit or edit.state.
 			$this->setState('filter.published', 1);
@@ -357,11 +358,8 @@ class ContentModelCategory extends JModelList
 			// Compute selected asset permissions.
 			if (is_object($this->_item))
 			{
-				$user  = JFactory::getUser();
-				$asset = 'com_content.category.' . $this->_item->id;
-
 				// Check general create permission.
-				if ($user->authorise('core.create', $asset))
+				if (JFactory::getUser()->isAuthorised('core.create', 'com_content', $this->_item->asset_id))
 				{
 					$this->_item->getParams()->set('access-create', true);
 				}

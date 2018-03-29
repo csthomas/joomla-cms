@@ -24,7 +24,7 @@ function hathormessage_postinstall_condition()
 	$template       = 'n/a';
 
 	// We can only do that if you have edit permissions in com_templates
-	if ($user->authorise('core.edit.state', 'com_templates'))
+	if ($user->isAuthorised('core.edit.state', 'com_templates'))
 	{
 		$query = $db->getQuery(true)
 			->select('template')
@@ -104,7 +104,7 @@ function hathormessage_postinstall_action()
 	}
 
 	// We can only do that if you have edit permissions in com_templates
-	if ($user->authorise('core.edit.state', 'com_templates'))
+	if ($user->isAuthorised('core.edit.state', 'com_templates'))
 	{
 		$query = $db->getQuery(true)
 			->update($db->quoteName('#__template_styles'))
